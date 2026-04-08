@@ -617,6 +617,83 @@ app.get("/api/projects/:id/stats/time-analysis", async (c) => {
   return json(c, { time: rows.results ?? [] });
 });
 
+// ── Survey ─────────────────────────────────────────────────────────────────
+app.get("/api/projects/:id/survey/my", async (c) => {
+  const user = getUser(c);
+  const row = await c.env.DB.prepare("SELECT * FROM survey_responses WHERE project_id=? AND user_id=?")
+    .bind(c.req.param("id"), user.userId).first<any>();
+  return json(c, { response: row ?? null });
+});
+
+app.post("/api/projects/:id/survey/submit", async (c) => {
+  const projectId = c.req.param("id");
+  const user = getUser(c);
+  const body = await c.req.json<any>();
+  const responseId = uid("resp_");
+  await c.env.DB.prepare(
+    "INSERT INTO survey_responses(response_id,project_id,user_id,likert_json,mc_answer,open_q1,open_q2,open_q3,submitted_at) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(project_id,user_id) DO UPDATE SET likert_json=excluded.likert_json, mc_answer=excluded.mc_answer, open_q1=excluded.open_q1, open_q2=excluded.open_q2, open_q3=excluded.open_q3, submitted_at=excluded.submitted_at"
+  ).bind(responseId, projectId, user.userId, JSON.stringify(body.likert ?? {}), body.mc_answer ?? null, body.open_q1 ?? "", body.open_q2 ?? "", body.open_q3 ?? "", nowIso()).run();
+  return json(c, { ok: true });
+});
+
+app.get("/api/projects/:id/survey/all", async (c) => {
+  const rows = await c.env.DB.prepare("SELECT * FROM survey_responses WHERE project_id=? ORDER BY submitted_at DESC")
+    .bind(c.req.param("id")).all();
+  return json(c, { responses: rows.results ?? [] });
+});
+
+// ── Visualization Stats ─────────────────────────────────────────────────────
+app.get("/api/projects/:id/viz/stats", async (c) => {
+  const projectId = c.req.param("id");
+  const user = getUser(c);
+  // Manual label distribution (this user)
+  const manualDist = await c.env.DB.prepare(
+    "SELECT label, COUNT(*) AS cnt FROM manual_labels WHERE project_id=? AND user_id=? GROUP BY label"
+  ).bind(projectId, user.userId).all<any>();
+  // LLM label distribution (accepted labels)
+  const llmDist = await c.env.DB.prepare(
+    "SELECT COALESCE(accepted_label, predicted_label) AS label, COUNT(*) AS cnt FROM llm_labels WHERE project_id=? GROUP BY label"
+  ).bind(projectId).all<any>();
+  // Time comparison: manual avg
+  const manualTime = await c.env.DB.prepare(
+    "SELECT AVG(active_ms) AS avg_ms FROM label_attempts WHERE project_id=? AND user_id=? AND task='manual' AND is_valid=1"
+  ).bind(projectId, user.userId).first<any>();
+  // Time comparison: LLM avg
+  const llmTime = await c.env.DB.prepare(
+    "SELECT AVG(active_ms) AS avg_ms FROM label_attempts WHERE project_id=? AND user_id=? AND task='llm' AND is_valid=1"
+  ).bind(projectId, user.userId).first<any>();
+  // Items where user labeled manually AND LLM labeled — for comparison
+  const diffRows = await c.env.DB.prepare(
+    "SELECT ml.item_id, ml.label AS manual_label, COALESCE(ll.accepted_label, ll.predicted_label) AS llm_label, di.content_text AS text FROM manual_labels ml LEFT JOIN llm_labels ll ON ll.project_id=ml.project_id AND ll.item_id=ml.item_id LEFT JOIN data_items di ON di.project_id=ml.project_id AND di.item_id=ml.item_id WHERE ml.project_id=? AND ml.user_id=? ORDER BY di.ordering LIMIT 200"
+  ).bind(projectId, user.userId).all<any>();
+
+  const manualDistMap: Record<string, number> = {};
+  for (const r of manualDist.results ?? []) manualDistMap[r.label] = Number(r.cnt ?? 0);
+  const llmDistMap: Record<string, number> = {};
+  for (const r of llmDist.results ?? []) if (r.label) llmDistMap[r.label] = Number(r.cnt ?? 0);
+
+  const totalManual = Number(manualTime?.avg_ms ?? 0);
+  const totalLlm = Number(llmTime?.avg_ms ?? 0);
+
+  return json(c, {
+    label_distribution: { manual: manualDistMap, llm: llmDistMap },
+    time_comparison: {
+      manual_avg_ms: Math.round(totalManual),
+      llm_avg_ms: Math.round(totalLlm),
+      saved_pct: totalManual > 0 && totalLlm > 0 ? Math.round((1 - totalLlm / totalManual) * 100) : null
+    },
+    label_diff: (diffRows.results ?? []).map((r) => ({
+      item_id: r.item_id,
+      text: (r.text ?? "").slice(0, 200),
+      manual_label: r.manual_label,
+      llm_label: r.llm_label,
+      diff: r.manual_label !== r.llm_label
+    })).filter((r) => r.llm_label != null),
+    total_items: (manualDist.results ?? []).reduce((s, r) => s + Number(r.cnt ?? 0), 0)
+  });
+});
+
+// ── Export ──────────────────────────────────────────────────────────────────
 app.get("/api/projects/:id/export", async (c) => {
   const projectId = c.req.param("id");
   const format = c.req.query("format") ?? "json";

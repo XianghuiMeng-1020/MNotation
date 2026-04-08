@@ -26,13 +26,16 @@ export function ProjectDetailPage() {
   const pct = overview?.total_items > 0 ? Math.round(overview.total_labels / overview.total_items * 100) : 0;
 
   const quickActions = [
+    { icon: "👋", label: t("projects.welcome"), to: `/projects/${projectId}/welcome` },
     { icon: "🏷️", label: t("projects.startLabeling"), to: `/projects/${projectId}/label`, primary: true },
     { icon: "🤖", label: t("llm.title"), to: `/projects/${projectId}/llm` },
     { icon: "📊", label: t("projects.viewIrr"), to: `/projects/${projectId}/irr` },
     { icon: "⚡", label: t("projects.resolveConflicts"), to: `/projects/${projectId}/conflicts` },
+    { icon: "📈", label: t("projects.visualization"), to: `/projects/${projectId}/visualization` },
+    { icon: "📝", label: t("projects.survey"), to: `/projects/${projectId}/survey` },
     { icon: "📤", label: t("projects.exportData"), to: `/projects/${projectId}/export` },
     { icon: "⚙️", label: t("projects.settings"), to: `/projects/${projectId}/settings` },
-    { icon: "📈", label: t("projects.adminDashboard"), to: `/projects/${projectId}/admin` },
+    { icon: "🗂️", label: t("projects.adminDashboard"), to: `/projects/${projectId}/admin` },
   ];
 
   return (

@@ -95,5 +95,11 @@ export const api = {
   getTimeAnalysis: (id: string) => req(`/api/projects/${id}/stats/time-analysis`),
   exportData: (id: string, format: "csv" | "json" | "xlsx") => req(`/api/projects/${id}/export?format=${format}`),
 
+  getSurveyResponse: (id: string) => req(`/api/projects/${id}/survey/my`),
+  submitSurvey: (id: string, body: unknown) => req(`/api/projects/${id}/survey/submit`, { method: "POST", body: JSON.stringify(body) }),
+  getSurveyAll: (id: string) => req(`/api/projects/${id}/survey/all`),
+
+  getVizStats: (id: string) => req(`/api/projects/${id}/viz/stats`),
+
   health: () => req("/api/health")
 };
