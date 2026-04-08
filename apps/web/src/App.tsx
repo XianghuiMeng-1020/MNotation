@@ -19,22 +19,8 @@ import { AdminConfigPage } from "./pages/admin/AdminConfigPage";
 export default function App() {
   return (
     <>
-      <nav style={{
-        position: "sticky",
-        top: 0,
-        zIndex: 100,
-        background: "var(--surface)",
-        borderBottom: "1px solid var(--border-color)",
-        padding: "0 1.25rem",
-        height: "52px",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        backdropFilter: "blur(8px)"
-      }}>
-        <a href="/projects" style={{ fontWeight: 700, fontSize: "1.1rem", textDecoration: "none", color: "var(--text-primary)", letterSpacing: "-0.02em" }}>
-          MNotation
-        </a>
+      <nav className="top-nav">
+        <a href="/projects" className="top-nav-logo">MNotation</a>
         <LanguageSwitcher />
       </nav>
       <Routes>
