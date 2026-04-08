@@ -19,11 +19,11 @@ export function ProjectDetailPage() {
     Promise.all([
       api.getProject(projectId).then((r: any) => setProject(r.project)),
       api.getStatsOverview(projectId).then((r: any) => setOverview(r)),
-      api.getLatestIrr(projectId).then((r: any) => setIrr(r)).catch(() => setIrr(null))
+      api.getLatestIrr(projectId).then((r: any) => setIrr(r)).catch(() => setIrr(null)),
     ]).finally(() => setLoading(false));
   }, [projectId]);
 
-  const pct = overview?.total_items > 0 ? Math.round(overview.total_labels / overview.total_items * 100) : 0;
+  const pct = overview?.total_items > 0 ? Math.round((overview.total_labels / overview.total_items) * 100) : 0;
 
   const quickActions = [
     { icon: "👋", label: t("projects.welcome"), to: `/projects/${projectId}/welcome` },
@@ -39,96 +39,90 @@ export function ProjectDetailPage() {
   ];
 
   return (
-    <div className="page">
-      {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.5rem" }}>
+    <div className="page" style={{ maxWidth: 640 }}>
+      {/* Back link + title */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
         <div>
-          <Link to="/projects" style={{ fontSize: "0.82rem", color: "var(--text-muted)", textDecoration: "none" }}>← {t("projects.title")}</Link>
-          <h1 style={{ margin: "0.25rem 0 0" }}>{project?.name ?? "…"}</h1>
+          <Link to="/projects" style={{ fontSize: 13, color: "var(--color-text-muted)", textDecoration: "none" }}>
+            ← {t("projects.backToProject")}
+          </Link>
+          <h1 style={{ margin: "4px 0 0", fontSize: 22, background: "var(--grad-primary)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+            {project?.name ?? "…"}
+          </h1>
           {project?.description && (
-            <p style={{ margin: "0.3rem 0 0", color: "var(--text-muted)", fontSize: "0.88rem" }}>{project.description}</p>
+            <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--color-text-secondary)" }}>{project.description}</p>
           )}
         </div>
         <NotificationBell projectId={projectId} />
       </div>
 
       {loading ? (
-        <div style={{ display: "grid", gap: "1rem" }}>
-          {[1, 2].map((i) => <div key={i} className="card skeleton" style={{ height: "100px" }} />)}
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {[1, 2, 3].map((i) => <div key={i} className="card skeleton" style={{ height: 80 }} />)}
         </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-          {/* Left column */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-            {/* Progress */}
-            <div className="card">
-              <h3 style={{ marginBottom: "1rem" }}>{t("projects.progress")}</h3>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.75rem", marginBottom: "1rem" }}>
+        <>
+          {/* Progress card */}
+          <div className="card" style={{ marginBottom: 12 }}>
+            <h3 style={{ margin: "0 0 12px", fontSize: 14 }}>{t("projects.progress")}</h3>
+            <div style={{ display: "flex", justifyContent: "space-around", marginBottom: 12 }}>
+              {[
+                { label: t("admin.totalItems"), value: overview?.total_items ?? 0 },
+                { label: t("admin.totalLabels"), value: overview?.total_labels ?? 0 },
+                { label: t("admin.openConflicts"), value: overview?.open_conflicts ?? 0 },
+              ].map(({ label, value }) => (
+                <div key={label} style={{ textAlign: "center" }}>
+                  <div style={{ fontWeight: 700, fontSize: 22 }}>{value}</div>
+                  <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>{label}</div>
+                </div>
+              ))}
+            </div>
+            <div className="progress-bar-track">
+              <div className="progress-bar-fill" style={{ width: `${pct}%` }} />
+            </div>
+            <div style={{ fontSize: 12, color: "var(--color-text-muted)", textAlign: "right", marginTop: 4 }}>{pct}%</div>
+          </div>
+
+          {/* IRR card */}
+          {irr && (
+            <div className="card" style={{ marginBottom: 12 }}>
+              <h3 style={{ margin: "0 0 10px", fontSize: 14 }}>{t("projects.irr")}</h3>
+              <div style={{ display: "flex", gap: 8 }}>
                 {[
-                  { label: t("admin.totalItems"), value: overview?.total_items ?? 0 },
-                  { label: t("admin.totalLabels"), value: overview?.total_labels ?? 0 },
-                  { label: t("admin.openConflicts"), value: overview?.open_conflicts ?? 0 },
+                  { label: t("irr.fleissKappa"), value: irr.fleiss_kappa != null ? Number(irr.fleiss_kappa).toFixed(3) : "—" },
+                  { label: t("irr.percentAgreement"), value: irr.percent_agreement != null ? `${(Number(irr.percent_agreement) * 100).toFixed(1)}%` : "—" },
                 ].map(({ label, value }) => (
-                  <div key={label} style={{ textAlign: "center" }}>
-                    <div style={{ fontWeight: 700, fontSize: "1.4rem" }}>{value}</div>
-                    <div style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>{label}</div>
+                  <div key={label} style={{ flex: 1, textAlign: "center", padding: 12, background: "var(--color-surface-raised)", borderRadius: 10 }}>
+                    <div style={{ fontWeight: 700, fontSize: 18 }}>{value}</div>
+                    <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>{label}</div>
                   </div>
                 ))}
               </div>
-              <div style={{ height: "8px", borderRadius: "4px", background: "var(--surface-raised)", overflow: "hidden" }}>
-                <div style={{ height: "100%", width: `${pct}%`, background: "var(--accent)", borderRadius: "4px", transition: "width 0.6s" }} />
-              </div>
-              <div style={{ fontSize: "0.78rem", color: "var(--text-muted)", textAlign: "right", marginTop: "0.3rem" }}>{pct}%</div>
             </div>
+          )}
 
-            {/* IRR summary */}
-            {irr && (
-              <div className="card">
-                <h3 style={{ marginBottom: "0.75rem" }}>{t("projects.irr")}</h3>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
-                  {[
-                    { label: t("irr.fleissKappa"), value: irr.fleiss_kappa != null ? Number(irr.fleiss_kappa).toFixed(3) : "—" },
-                    { label: t("irr.percentAgreement"), value: irr.percent_agreement != null ? `${(Number(irr.percent_agreement) * 100).toFixed(1)}%` : "—" },
-                  ].map(({ label, value }) => (
-                    <div key={label} style={{ textAlign: "center", padding: "0.6rem", background: "var(--surface-raised)", borderRadius: "8px" }}>
-                      <div style={{ fontWeight: 700, fontSize: "1.1rem" }}>{value}</div>
-                      <div style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>{label}</div>
-                    </div>
-                  ))}
-                </div>
-                {irr.calculated_at && (
-                  <p style={{ fontSize: "0.72rem", color: "var(--text-muted)", textAlign: "right", marginTop: "0.4rem" }}>
-                    {new Date(irr.calculated_at).toLocaleString()}
-                  </p>
-                )}
-              </div>
-            )}
+          {/* Chart */}
+          {overview?.labels?.length > 0 && (() => {
+            const counts: Record<string, number> = {};
+            overview.labels.forEach((l: string, i: number) => { counts[l] = overview.values?.[i] ?? 0; });
+            return <BarChart title={t("admin.labelDistribution")} counts={counts} />;
+          })()}
 
-            {/* Label distribution chart */}
-            {overview?.labels?.length > 0 && (
-              <div className="card">
-                <h3 style={{ marginBottom: "1rem" }}>{t("admin.labelDistribution")}</h3>
-                <BarChart labels={overview.labels} values={overview.values} />
-              </div>
-            )}
-          </div>
-
-          {/* Right column: quick actions */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            <h3 style={{ margin: "0 0 0.5rem" }}>Quick Actions</h3>
+          {/* Quick Actions */}
+          <h3 style={{ fontSize: 14, margin: "0 0 8px" }}>{t("projects.quickActions")}</h3>
+          <div className="label-grid" style={{ gridTemplateColumns: "1fr 1fr" }}>
             {quickActions.map(({ icon, label, to, primary }) => (
               <Link
                 key={to}
                 to={to}
-                className={`btn ${primary ? "primary" : ""}`}
-                style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.75rem 1rem", justifyContent: "flex-start", textDecoration: "none" }}
+                className={`label-btn${primary ? " active" : ""}`}
+                style={{ textDecoration: "none", fontSize: 13, gap: 6 }}
               >
-                <span>{icon}</span>
-                <span>{label}</span>
+                <span>{icon}</span> {label}
               </Link>
             ))}
           </div>
-        </div>
+        </>
       )}
     </div>
   );

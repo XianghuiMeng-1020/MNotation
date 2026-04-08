@@ -56,12 +56,11 @@ export function AdminDashboardPage() {
           </div>
 
           {/* Label distribution */}
-          {overview?.labels?.length > 0 && (
-            <div className="card" style={{ marginBottom: "1rem" }}>
-              <h3 style={{ marginBottom: "1rem" }}>{t("admin.labelDistribution")}</h3>
-              <BarChart labels={overview.labels} values={overview.values} />
-            </div>
-          )}
+          {overview?.labels?.length > 0 && (() => {
+            const counts: Record<string, number> = {};
+            (overview.labels as string[]).forEach((l: string, i: number) => { counts[l] = overview.values?.[i] ?? 0; });
+            return <BarChart title={t("admin.labelDistribution")} counts={counts} />;
+          })()}
 
           {/* Per member progress */}
           {members.length > 0 && (

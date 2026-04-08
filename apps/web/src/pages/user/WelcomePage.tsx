@@ -1,8 +1,9 @@
-import { Link, useParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useI18n } from "../../lib/i18n";
+import { ENABLE_ACTIVE_LEARNING } from "../../lib/featureFlags";
 
 export function WelcomePage() {
-  const { projectId = "" } = useParams();
+  const nav = useNavigate();
   const { t } = useI18n();
 
   return (
@@ -10,7 +11,7 @@ export function WelcomePage() {
       <div className="welcome-card">
         <div className="welcome-icon">🏷️</div>
         <h1 className="welcome-title">{t("welcome.title")}</h1>
-        <p className="welcome-subtitle">{t("welcome.subtitle")}</p>
+        <p className="welcome-subtitle">{t(ENABLE_ACTIVE_LEARNING ? "welcome.subtitle" : "welcome.subtitleNoAL")}</p>
 
         <div className="welcome-steps">
           <div className="welcome-step">
@@ -21,25 +22,23 @@ export function WelcomePage() {
             <span className="welcome-step-num">2</span>
             <span>{t("welcome.step2")}</span>
           </div>
-          <div className="welcome-step">
-            <span className="welcome-step-num">3</span>
-            <span>{t("welcome.step3")}</span>
-          </div>
-          <div className="welcome-step">
-            <span className="welcome-step-num">4</span>
-            <span>{t("welcome.step4")}</span>
-          </div>
+          {ENABLE_ACTIVE_LEARNING && (
+            <div className="welcome-step">
+              <span className="welcome-step-num">3</span>
+              <span>{t("welcome.step3")}</span>
+            </div>
+          )}
         </div>
 
         <p className="welcome-note">{t("welcome.note")}</p>
 
-        <Link
-          to={`/projects/${projectId}/label`}
+        <button
           className="btn primary full-width lg"
-          style={{ marginTop: 8, textDecoration: "none" }}
+          onClick={() => nav("/user/start")}
+          style={{ marginTop: 8 }}
         >
           {t("welcome.letsGo")} →
-        </Link>
+        </button>
       </div>
     </div>
   );

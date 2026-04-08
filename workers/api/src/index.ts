@@ -33,10 +33,32 @@ async function memberGuard(c: any, projectId: string) {
 
 app.get("/api/health", (c) => json(c, { status: "ok", time: nowIso() }));
 
+// Cookie-based login (no Cloudflare Access needed)
+app.post("/api/auth/login", async (c) => {
+  const body = await c.req.json<{ email?: string; name?: string }>();
+  if (!body.email) return json(c, { error: "email required" }, 400);
+  const cookieVal = encodeURIComponent(JSON.stringify({ email: body.email, name: body.name ?? body.email.split("@")[0] }));
+  const headers = new Headers();
+  headers.set("Set-Cookie", `mnotation_user=${cookieVal}; Path=/; HttpOnly; SameSite=None; Secure; Max-Age=604800`);
+  headers.set("Content-Type", "application/json");
+  // Upsert user
+  const userId = body.email;
+  const displayName = body.name ?? body.email.split("@")[0];
+  await c.env.DB.prepare(
+    "INSERT INTO users(user_id, email, display_name, created_at, last_active_at) VALUES(?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET email=excluded.email, display_name=excluded.display_name, last_active_at=excluded.last_active_at"
+  ).bind(userId, body.email, displayName, nowIso(), nowIso()).run();
+  return new Response(JSON.stringify({ ok: true, user: { userId, email: body.email, displayName } }), { status: 200, headers });
+});
+
 app.use("/api/*", requireAuth);
 
 app.get("/api/auth/me", async (c) => json(c, { user: getUser(c) }));
-app.post("/api/auth/logout", async (c) => json(c, { ok: true }));
+app.post("/api/auth/logout", async (c) => {
+  const headers = new Headers();
+  headers.set("Set-Cookie", "mnotation_user=; Path=/; HttpOnly; SameSite=None; Secure; Max-Age=0");
+  headers.set("Content-Type", "application/json");
+  return new Response(JSON.stringify({ ok: true }), { status: 200, headers });
+});
 
 app.post("/api/projects", async (c) => {
   const user = getUser(c);

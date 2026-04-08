@@ -4,8 +4,6 @@ import { DataItemDisplay } from "../../components/DataItemDisplay";
 import { LabelingCard } from "../../components/LabelingCard";
 import { LabelComparison } from "../../components/LabelComparison";
 import { ProgressRing } from "../../components/ProgressRing";
-import { ChatPanel } from "../../components/ChatPanel";
-import { NotificationBell } from "../../components/NotificationBell";
 import { api } from "../../lib/api";
 import { useAttemptTracker } from "../../hooks/useAttemptTracker";
 import { useI18n } from "../../lib/i18n";
@@ -32,7 +30,7 @@ export function LabelingPage() {
     try {
       const [nextRes, schemeRes] = await Promise.all([
         api.nextLabelItem(projectId, phase, task) as any,
-        api.getCodingScheme(projectId) as any
+        api.getCodingScheme(projectId) as any,
       ]);
       const nextItem = nextRes.item ?? null;
       setItem(nextItem);
@@ -54,7 +52,7 @@ export function LabelingPage() {
         item_id: item.item_id,
         label,
         phase,
-        attempt: tracker.finalize()
+        attempt: tracker.finalize(),
       });
       await load();
     } finally {
@@ -77,72 +75,68 @@ export function LabelingPage() {
 
   if (done && !item) {
     return (
-      <div className="page" style={{ textAlign: "center", paddingTop: "4rem" }}>
-        <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>🎉</div>
-        <h2>{t("labeling.allDone")}</h2>
-        <p style={{ color: "var(--text-muted)" }}>{t("labeling.progress")}: {progress.done}/{progress.total}</p>
-        <Link to={`/projects/${projectId}`} className="btn primary" style={{ marginTop: "1rem", display: "inline-block" }}>
-          ← Back to Project
-        </Link>
+      <div className="page" style={{ justifyContent: "center", minHeight: "100dvh" }}>
+        <div className="welcome-card">
+          <div style={{ fontSize: 56, marginBottom: 12 }}>🎉</div>
+          <h2>{t("labeling.allDone")}</h2>
+          <p style={{ color: "var(--color-text-muted)", marginTop: 8 }}>
+            {t("labeling.progress")}: {progress.done}/{progress.total}
+          </p>
+          <Link
+            to={`/projects/${projectId}/visualization`}
+            className="btn primary full-width lg"
+            style={{ marginTop: 20, textDecoration: "none" }}
+          >
+            {t("projects.visualization")} →
+          </Link>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="page">
-      {/* Top bar */}
-      <div className="progress-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-          <Link to={`/projects/${projectId}`} style={{ fontSize: "0.82rem", color: "var(--text-muted)", textDecoration: "none" }}>← Back</Link>
+      {/* Sticky progress header — V1 pattern */}
+      <div className="progress-header">
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <ProgressRing done={progress.done} total={progress.total} />
-          <div>
-            <strong style={{ fontSize: "0.95rem" }}>{t("labeling.title")}</strong>
-            <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
-              {t("labeling.phase")}: {t(`labeling.phase.${phase}` as any)}
+          <div className="progress-info">
+            <div className="progress-title">{t("labeling.title")}</div>
+            <div className="progress-subtitle">
+              {t("labeling.phase")}: {t(`labeling.phase.${phase}` as any)} · {progress.done}/{progress.total}
             </div>
           </div>
         </div>
-        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {lastItem && (
-            <button className="btn sm" onClick={undo} disabled={undoing}>
+            <button className="btn" style={{ padding: "6px 14px", fontSize: 13, minHeight: 36 }} onClick={undo} disabled={undoing}>
               {undoing ? "…" : t("labeling.undo")}
             </button>
           )}
-          <NotificationBell projectId={projectId} />
+          <Link to={`/projects/${projectId}`} style={{ fontSize: 12, color: "var(--color-text-muted)", textDecoration: "none" }}>←</Link>
         </div>
       </div>
 
-      {/* Main grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: "1rem", alignItems: "start" }}>
-        {/* Left: item + labeling */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-          {item ? (
-            <>
-              <DataItemDisplay item={item} />
-              <LabelingCard
-                labels={labels}
-                onSubmit={submit}
-                disabled={submitting}
-              />
-              <LabelComparison
-                manualLabel={item?.my_label}
-                llmLabel={item?.llm_label}
-              />
-            </>
-          ) : (
-            <div className="card skeleton" style={{ height: "200px" }} />
-          )}
+      {/* Undo banner */}
+      {lastItem && (
+        <div className="undo-banner">
+          <span className="undo-text">
+            <span className="undo-label">{lastItem.my_label ?? "labeled"}</span>
+            {" — "}
+            <span className="undo-excerpt">{(lastItem.content_text ?? "").slice(0, 60)}…</span>
+          </span>
         </div>
+      )}
 
-        {/* Right: chat */}
-        <div style={{ position: "sticky", top: "1rem" }}>
-          <ChatPanel
-            projectId={projectId}
-            itemId={item?.item_id}
-            messages={[]}
-          />
-        </div>
-      </div>
+      {item ? (
+        <>
+          <DataItemDisplay item={item} />
+          <LabelingCard labels={labels} onSubmit={submit} disabled={submitting} />
+          <LabelComparison manualLabel={item?.my_label} llmLabel={item?.llm_label} />
+        </>
+      ) : (
+        <div className="card skeleton" style={{ height: 200 }} />
+      )}
     </div>
   );
 }

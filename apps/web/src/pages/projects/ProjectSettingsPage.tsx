@@ -35,7 +35,7 @@ export function ProjectSettingsPage() {
         api.getProject(projectId) as any,
         api.getMembers(projectId) as any,
         api.getCodingScheme(projectId) as any,
-        api.getPrompts(projectId) as any,
+        api.getProjectPrompts(projectId) as any,
         api.getCodingSchemeHistory(projectId) as any
       ]);
       setProject(pRes.project);
@@ -64,7 +64,7 @@ export function ProjectSettingsPage() {
   const savePrompts = async () => {
     setSaving(true);
     try {
-      await api.setPrompts(projectId, { prompt1, prompt2 });
+      await api.setProjectPrompts(projectId, { prompt1, prompt2 });
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } finally { setSaving(false); }

@@ -1,11 +1,73 @@
-import { useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../../lib/api";
+import { useI18n } from "../../lib/i18n";
 
 export function LoginPage() {
+  const { t } = useI18n();
   const nav = useNavigate();
-  useEffect(() => {
-    api.me().then(() => nav("/projects", { replace: true })).catch(() => undefined);
-  }, [nav]);
-  return <div className="page"><div className="card">Authenticating with Cloudflare Access...</div></div>;
+  const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const submit = async () => {
+    if (!email.trim() || loading) return;
+    setLoading(true);
+    setError("");
+    try {
+      await api.login(email.trim(), name.trim() || undefined);
+      nav("/projects");
+    } catch (e: any) {
+      setError(e?.message ?? t("common.error"));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="page" style={{ justifyContent: "center", minHeight: "100dvh" }}>
+      <div className="welcome-card">
+        <div className="welcome-icon">🏷️</div>
+        <h1 className="welcome-title">MNotation</h1>
+        <p className="welcome-subtitle">
+          {t("auth.subtitle")}
+        </p>
+
+        <div style={{ textAlign: "left", marginTop: 24 }}>
+          <div className="form-group">
+            <label>{t("auth.email")}</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              onKeyDown={(e) => e.key === "Enter" && submit()}
+            />
+          </div>
+          <div className="form-group">
+            <label>{t("auth.displayName")}</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder={t("auth.displayNamePlaceholder")}
+              onKeyDown={(e) => e.key === "Enter" && submit()}
+            />
+          </div>
+        </div>
+
+        {error && <div className="error-box" style={{ marginTop: 12 }}>{error}</div>}
+
+        <button
+          className="btn primary full-width lg"
+          style={{ marginTop: 16 }}
+          onClick={submit}
+          disabled={!email.trim() || loading}
+        >
+          {loading ? <span className="spinner" style={{ width: 18, height: 18, borderWidth: 2 }} /> : <>{t("auth.login")} →</>}
+        </button>
+      </div>
+    </div>
+  );
 }
