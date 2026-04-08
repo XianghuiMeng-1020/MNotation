@@ -142,7 +142,12 @@ app.post("/api/projects/:id/datasets/upload", async (c) => {
   const datasetId = uid("ds_");
   const key = `${projectId}/${datasetId}/${body.filename ?? "dataset.txt"}`;
   const text = body.content_base64 ? atob(body.content_base64) : "";
-  await c.env.UPLOADS.put(key, text);
+  if (c.env.UPLOADS) {
+    await c.env.UPLOADS.put(key, text);
+  } else {
+    // R2 not enabled: store content inline in D1 as a fallback (limited to ~50KB)
+    await c.env.DB.prepare("INSERT INTO config(project_id,key,value,updated_at) VALUES(?,?,?,?) ON CONFLICT(project_id,key) DO UPDATE SET value=excluded.value").bind(projectId, `dataset_content:${datasetId}`, text.slice(0, 50000), nowIso()).run();
+  }
   await c.env.DB.prepare(
     "INSERT INTO datasets(dataset_id,project_id,filename,file_format,r2_key,row_count,chunk_config_json,status,uploaded_by,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)"
   ).bind(datasetId, projectId, body.filename ?? "dataset.txt", body.file_format ?? "txt", key, 0, "{}", "uploaded", getUser(c).userId, nowIso()).run();
@@ -156,9 +161,16 @@ app.post("/api/projects/:id/datasets/:datasetId/preview", async (c) => {
   if (denied) return denied;
   const ds = await c.env.DB.prepare("SELECT * FROM datasets WHERE dataset_id=? AND project_id=?").bind(datasetId, projectId).first<any>();
   if (!ds) return json(c, { error: "dataset_not_found" }, 404);
-  const obj = await c.env.UPLOADS.get(ds.r2_key);
-  if (!obj) return json(c, { error: "missing_r2_object" }, 404);
-  const bytes = await obj.arrayBuffer();
+  let text = "";
+  if (c.env.UPLOADS) {
+    const obj = await c.env.UPLOADS.get(ds.r2_key);
+    if (!obj) return json(c, { error: "missing_r2_object" }, 404);
+    text = await obj.text();
+  } else {
+    const row = await c.env.DB.prepare("SELECT value FROM config WHERE project_id=? AND key=?").bind(projectId, `dataset_content:${datasetId}`).first<any>();
+    text = row?.value ?? "";
+  }
+  const bytes = new TextEncoder().encode(text).buffer;
   const parsed = await parseFileByFormat(ds.file_format, bytes);
   return json(c, { columns: parsed.columns, preview: parsed.rows.slice(0, 20) });
 });
@@ -174,9 +186,16 @@ app.post("/api/projects/:id/datasets/:datasetId/process", async (c) => {
   const datasetId = c.req.param("datasetId");
   const ds = await c.env.DB.prepare("SELECT * FROM datasets WHERE dataset_id=? AND project_id=?").bind(datasetId, projectId).first<any>();
   if (!ds) return json(c, { error: "dataset_not_found" }, 404);
-  const obj = await c.env.UPLOADS.get(ds.r2_key);
-  if (!obj) return json(c, { error: "missing_r2_object" }, 404);
-  const bytes = await obj.arrayBuffer();
+  let text2 = "";
+  if (c.env.UPLOADS) {
+    const obj = await c.env.UPLOADS.get(ds.r2_key);
+    if (!obj) return json(c, { error: "missing_r2_object" }, 404);
+    text2 = await obj.text();
+  } else {
+    const row = await c.env.DB.prepare("SELECT value FROM config WHERE project_id=? AND key=?").bind(projectId, `dataset_content:${datasetId}`).first<any>();
+    text2 = row?.value ?? "";
+  }
+  const bytes = new TextEncoder().encode(text2).buffer;
   const parsed = await parseFileByFormat(ds.file_format, bytes);
   const cfg = parseJsonSafe(ds.chunk_config_json, { mode: "row_per_item" });
   const chunks = chunkData(parsed, cfg as any);

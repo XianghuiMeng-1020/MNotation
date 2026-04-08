@@ -33,8 +33,8 @@ export function CreateProjectPage() {
   const [fileBase64, setFileBase64] = useState("");
   const [fileName, setFileName] = useState("");
   const [fileFormat, setFileFormat] = useState("txt");
-  const [previewCols, setPreviewCols] = useState<string[]>([]);
-  const [previewRows, setPreviewRows] = useState<Record<string, string>[]>([]);
+  const [previewCols] = useState<string[]>([]);
+  const [previewRows] = useState<Record<string, string>[]>([]);
 
   const canNext = () => {
     if (step === 1) return name.trim().length > 0;

@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../../lib/api";
 import { useI18n } from "../../lib/i18n";
-import { storage } from "../../lib/storage";
 
 export function ProjectListPage() {
   const { t } = useI18n();
@@ -43,9 +42,6 @@ export function ProjectListPage() {
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "1rem" }}>
         {projects.map((p) => {
-          let settings: any = {};
-          try { settings = JSON.parse(p.settings_json ?? "{}"); } catch { /* ignore */ }
-
           return (
             <div
               key={p.project_id}

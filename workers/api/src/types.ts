@@ -4,7 +4,7 @@ export type LlmMode = "prompt1" | "prompt2" | "custom";
 
 export interface Env {
   DB: D1Database;
-  UPLOADS: R2Bucket;
+  UPLOADS?: R2Bucket;
   STATS_HUB: DurableObjectNamespace;
   QWEN_LIMITER: DurableObjectNamespace;
   AL_RUNNER: DurableObjectNamespace;

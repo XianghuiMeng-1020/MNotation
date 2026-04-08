@@ -2,8 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { useI18n } from "../lib/i18n";
 import { api } from "../lib/api";
 import { useNotifications } from "../hooks/useNotifications";
-import { storage } from "../lib/storage";
-
 type Props = {
   projectId?: string;
 };

@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { IrrDashboard, type IrrSnapshot } from "../../components/IrrDashboard";
+import { IrrDashboard } from "../../components/IrrDashboard";
 import { useIrr } from "../../hooks/useIrr";
 import { api } from "../../lib/api";
 import { useI18n } from "../../lib/i18n";

@@ -3,7 +3,7 @@ import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Tooltip, Lege
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
-export function BarChart({ labels, values, title }: { labels: string[]; values: number[]; title: string }) {
+export function BarChart({ labels, values, title = "" }: { labels: string[]; values: number[]; title?: string }) {
   const data = {
     labels,
     datasets: [{ label: title, data: values, backgroundColor: "#6366f1" }]

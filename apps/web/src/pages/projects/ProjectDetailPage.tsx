@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { BarChart } from "../../components/BarChart";
 import { NotificationBell } from "../../components/NotificationBell";
 import { api } from "../../lib/api";
@@ -8,7 +8,6 @@ import { useI18n } from "../../lib/i18n";
 export function ProjectDetailPage() {
   const { projectId = "" } = useParams();
   const { t } = useI18n();
-  const nav = useNavigate();
   const [project, setProject] = useState<any>(null);
   const [overview, setOverview] = useState<any>(null);
   const [irr, setIrr] = useState<any>(null);
