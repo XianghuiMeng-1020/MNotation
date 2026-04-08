@@ -27,8 +27,6 @@ database_name = "mnotation_db"
 database_id = "6e4dc1ad-084a-4fd6-b477-d8b7973cbdf0"
 migrations_dir = "db/migrations"
 
-# R2 bucket for file uploads (requires R2 to be enabled in Cloudflare Dashboard)
-# Uncomment after enabling R2:
-# [[r2_buckets]]
-# binding = "UPLOADS"
-# bucket_name = "mnotation-uploads"
+[[r2_buckets]]
+binding = "UPLOADS"
+bucket_name = "mnotation-uploads"
