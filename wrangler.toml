@@ -1,0 +1,32 @@
+name = "mnotation-api"
+main = "workers/api/src/index.ts"
+compatibility_date = "2025-01-01"
+
+[vars]
+IDLE_THRESHOLD_MS = "10000"
+MIN_ACTIVE_MS = "800"
+QWEN_MAX_CONCURRENT = "20"
+IRR_AUTO_CHECK_INTERVAL = "20"
+IRR_LOW_THRESHOLD = "0.3"
+
+[durable_objects]
+bindings = [
+  { name = "STATS_HUB", class_name = "StatsHub" },
+  { name = "QWEN_LIMITER", class_name = "QwenRateLimiter" },
+  { name = "AL_RUNNER", class_name = "AlRunner" },
+  { name = "CHAT_HUB", class_name = "ChatHub" }
+]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["StatsHub", "QwenRateLimiter", "AlRunner", "ChatHub"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "mnotation_db"
+database_id = "TO_BE_FILLED"
+migrations_dir = "db/migrations"
+
+[[r2_buckets]]
+binding = "UPLOADS"
+bucket_name = "mnotation-uploads"
