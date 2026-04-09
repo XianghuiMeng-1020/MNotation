@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactElement } from "react";
 import { Navigate } from "react-router-dom";
 import { api } from "../lib/api";
+import { useI18n } from "../lib/i18n";
 import { clearAdminSession, getAdminSessionStatus, getAdminToken, touchAdminSession } from "../lib/storage";
 
 function readAuth() {
@@ -8,6 +9,7 @@ function readAuth() {
 }
 
 export function AdminGuard({ children }: { children: ReactElement }) {
+  const { t } = useI18n();
   const [auth, setAuth] = useState(readAuth);
   const [verified, setVerified] = useState<boolean | null>(null);
   const [expiredOrMissing, setExpiredOrMissing] = useState<boolean>(false);
@@ -56,7 +58,15 @@ export function AdminGuard({ children }: { children: ReactElement }) {
 
   if (expiredOrMissing) return <Navigate to="/admin/login" replace state={{ reason: "expired" }} />;
   if (!token) return null;
-  if (verified === null) return null;
+  if (verified === null) {
+    return (
+      <div className="page" style={{ justifyContent: "center", minHeight: "100dvh" }}>
+        <div className="card" style={{ textAlign: "center", color: "var(--text-muted)" }}>
+          {t("common.verifying")}
+        </div>
+      </div>
+    );
+  }
   if (!verified) return <Navigate to="/admin/login" replace state={{ reason: "invalid" }} />;
   return children;
 }

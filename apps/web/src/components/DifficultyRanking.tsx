@@ -171,7 +171,7 @@ export function DifficultyRanking({ essay, onSubmit, submitting, onBackToLabelin
                   className="rank-arrow-btn"
                   onClick={() => moveItem(idx, -1)}
                   disabled={idx === 0}
-                  aria-label="Move up"
+                  aria-label={t("ranking.moveUp")}
                 >
                   ▲
                 </button>
@@ -179,7 +179,7 @@ export function DifficultyRanking({ essay, onSubmit, submitting, onBackToLabelin
                   className="rank-arrow-btn"
                   onClick={() => moveItem(idx, 1)}
                   disabled={idx === items.length - 1}
-                  aria-label="Move down"
+                  aria-label={t("ranking.moveDown")}
                 >
                   ▼
                 </button>

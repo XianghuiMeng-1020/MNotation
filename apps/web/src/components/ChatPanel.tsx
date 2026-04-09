@@ -38,6 +38,7 @@ export function ChatPanel({ projectId, itemId, messages, onSend, className = "" 
   const bottomRef = useRef<HTMLDivElement>(null);
   const [chatMessages, setChatMessages] = useState<Message[]>([]);
   const [noteMessages, setNoteMessages] = useState<Message[]>([]);
+  const [failedMessages, setFailedMessages] = useState<Array<{ id: string; content: string }>>([]);
 
   useEffect(() => {
     setChatMessages(messages.filter((m) => !m.item_id));
@@ -48,10 +49,11 @@ export function ChatPanel({ projectId, itemId, messages, onSend, className = "" 
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages, noteMessages, activeTab]);
 
-  const send = async () => {
-    const content = text.trim();
+  const send = async (overrideText?: string) => {
+    const content = (overrideText ?? text).trim();
     if (!content || sending) return;
     setSending(true);
+    const pendingId = crypto.randomUUID();
     try {
       if (onSend) {
         await onSend(content);
@@ -69,9 +71,20 @@ export function ChatPanel({ projectId, itemId, messages, onSend, className = "" 
         }
       }
       setText("");
+      setFailedMessages((prev) => prev.filter((x) => x.id !== pendingId));
+    } catch {
+      setFailedMessages((prev) => [...prev, { id: pendingId, content }]);
     } finally {
       setSending(false);
     }
+  };
+
+  const retryFailed = async (id: string) => {
+    const target = failedMessages.find((m) => m.id === id);
+    if (!target || sending) return;
+    setText(target.content);
+    setFailedMessages((prev) => prev.filter((m) => m.id !== id));
+    await send(target.content);
   };
 
   const displayMessages = activeTab === "chat" ? chatMessages : noteMessages;
@@ -79,11 +92,15 @@ export function ChatPanel({ projectId, itemId, messages, onSend, className = "" 
   return (
     <div className={`card ${className}`} style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: "320px", padding: 0, overflow: "hidden" }}>
       {/* Tabs */}
-      <div style={{ display: "flex", borderBottom: "1px solid var(--border-color)" }}>
+      <div role="tablist" aria-label="chat-tabs" style={{ display: "flex", borderBottom: "1px solid var(--border-color)" }}>
         {(["chat", "notes"] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
+            role="tab"
+            id={`tab-${tab}`}
+            aria-controls={`panel-${tab}`}
+            aria-selected={activeTab === tab}
             style={{
               flex: 1,
               padding: "0.6rem",
@@ -103,7 +120,12 @@ export function ChatPanel({ projectId, itemId, messages, onSend, className = "" 
       </div>
 
       {/* Messages */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "0.75rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+      <div
+        id={`panel-${activeTab}`}
+        role="tabpanel"
+        aria-labelledby={`tab-${activeTab}`}
+        style={{ flex: 1, overflowY: "auto", padding: "0.75rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}
+      >
         {displayMessages.length === 0 ? (
           <div style={{ textAlign: "center", color: "var(--text-muted)", padding: "1.5rem 0", fontSize: "0.85rem" }}>
             {t("chat.noMessages")}
@@ -154,22 +176,33 @@ export function ChatPanel({ projectId, itemId, messages, onSend, className = "" 
 
       {/* Input */}
       <div style={{ padding: "0.5rem 0.75rem", borderTop: "1px solid var(--border-color)", display: "flex", gap: "0.4rem" }}>
-        <input
+        <textarea
           className="input"
           placeholder={t("chat.placeholder")}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), send())}
-          style={{ flex: 1, padding: "0.45rem 0.7rem", fontSize: "0.88rem" }}
+          rows={2}
+          style={{ flex: 1, padding: "0.45rem 0.7rem", fontSize: "0.88rem", resize: "vertical", minHeight: 44 }}
         />
         <button
           className="btn primary sm"
-          onClick={send}
+          onClick={() => void send()}
           disabled={sending || !text.trim()}
         >
           {t("chat.send")}
         </button>
       </div>
+      {failedMessages.length > 0 && (
+        <div style={{ padding: "0.5rem 0.75rem", borderTop: "1px dashed var(--border-color)", display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+          {failedMessages.map((m) => (
+            <div key={m.id} style={{ fontSize: "0.78rem", color: "#ef4444", display: "flex", justifyContent: "space-between", gap: "0.5rem", alignItems: "center" }}>
+              <span>{t("chat.sendFailed")}: {(m.content || "").slice(0, 28)}{m.content.length > 28 ? "..." : ""}</span>
+              <button className="btn sm" onClick={() => void retryFailed(m.id)}>{t("common.retry")}</button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

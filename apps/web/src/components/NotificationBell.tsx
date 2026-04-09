@@ -1,16 +1,20 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useI18n } from "../lib/i18n";
 import { api } from "../lib/api";
 import { useNotifications } from "../hooks/useNotifications";
+import { useFocusTrap } from "../hooks/useFocusTrap";
 type Props = {
   projectId?: string;
 };
 
 export function NotificationBell({ projectId }: Props) {
   const { t } = useI18n();
+  const navigate = useNavigate();
   const { notifications, unreadCount, refresh } = useNotifications(projectId ?? "");
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -19,11 +23,35 @@ export function NotificationBell({ projectId }: Props) {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+  useFocusTrap(panelRef, open, () => setOpen(false));
 
   const markAllRead = async () => {
     if (!projectId) return;
     await api.markNotificationsRead(projectId, {});
     refresh();
+  };
+
+  const openNotification = async (n: any) => {
+    if (!projectId) return;
+    const meta = (() => {
+      try { return n.meta_json ? JSON.parse(n.meta_json) : {}; } catch { return {}; }
+    })() as Record<string, any>;
+    await api.markNotificationsRead(projectId, { ids: [n.notification_id] });
+    refresh();
+    setOpen(false);
+    if (meta.conflict_id || n.type === "conflict_detected" || n.type === "conflict_resolved") {
+      navigate(`/projects/${projectId}/conflicts${meta.conflict_id ? `?focus=${meta.conflict_id}` : ""}`);
+      return;
+    }
+    if (meta.item_id || n.type === "message") {
+      navigate(`/projects/${projectId}/label?item=${meta.item_id ?? ""}`);
+      return;
+    }
+    if (n.type === "irr_low") {
+      navigate(`/projects/${projectId}/irr`);
+      return;
+    }
+    navigate(`/projects/${projectId}`);
   };
 
   const typeIcon: Record<string, string> = {
@@ -79,7 +107,9 @@ export function NotificationBell({ projectId }: Props) {
       </button>
 
       {open && (
-        <div style={{
+        <div
+          ref={panelRef}
+          style={{
           position: "absolute",
           right: 0,
           top: "calc(100% + 8px)",
@@ -93,7 +123,8 @@ export function NotificationBell({ projectId }: Props) {
           display: "flex",
           flexDirection: "column",
           overflow: "hidden"
-        }}>
+          }}
+        >
           {/* Header */}
           <div style={{ padding: "0.75rem 1rem", borderBottom: "1px solid var(--border-color)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span style={{ fontWeight: 600 }}>{t("notifications.title")}</span>
@@ -114,13 +145,23 @@ export function NotificationBell({ projectId }: Props) {
               notifications.map((n) => (
                 <div
                   key={n.notification_id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => void openNotification(n)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      void openNotification(n);
+                    }
+                  }}
                   style={{
                     padding: "0.75rem 1rem",
                     borderBottom: "1px solid var(--border-color)",
                     background: n.is_read ? "transparent" : "rgba(99,102,241,0.04)",
                     display: "flex",
                     gap: "0.6rem",
-                    alignItems: "flex-start"
+                    alignItems: "flex-start",
+                    cursor: "pointer"
                   }}
                 >
                   <span style={{ fontSize: "1.2rem", flexShrink: 0 }}>{typeIcon[n.type] ?? "🔔"}</span>

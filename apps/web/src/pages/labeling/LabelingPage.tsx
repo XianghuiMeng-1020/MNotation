@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { DataItemDisplay } from "../../components/DataItemDisplay";
 import { LabelingCard } from "../../components/LabelingCard";
 import { LabelComparison } from "../../components/LabelComparison";
@@ -13,9 +13,12 @@ type Task = "manual" | "llm";
 
 export function LabelingPage() {
   const { projectId = "" } = useParams();
+  const [searchParams] = useSearchParams();
   const { t } = useI18n();
-  const [phase] = useState<Phase>("normal");
-  const [task] = useState<Task>("manual");
+  const phaseParam = searchParams.get("phase") as Phase | null;
+  const taskParam = searchParams.get("task") as Task | null;
+  const phase: Phase = phaseParam === "active" || phaseParam === "conflict_resolution" ? phaseParam : "normal";
+  const task: Task = taskParam === "llm" ? "llm" : "manual";
   const [item, setItem] = useState<any>(null);
   const [labels, setLabels] = useState<string[]>([]);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
@@ -23,10 +26,15 @@ export function LabelingPage() {
   const [undoing, setUndoing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [comparison, setComparison] = useState<any>(null);
   const tracker = useAttemptTracker(item?.item_id ?? "none");
 
   const load = async () => {
     if (!projectId) return;
+    setLoading(true);
+    setError("");
     try {
       const [nextRes, schemeRes] = await Promise.all([
         api.nextLabelItem(projectId, phase, task) as any,
@@ -38,23 +46,56 @@ export function LabelingPage() {
       const schemeCodes: string[] = (schemeRes?.labels ?? []).map((x: any) => x.code).slice(0, 12);
       setLabels(schemeCodes.length > 0 ? schemeCodes : ["CODE_A", "CODE_B", "CODE_C", "UNKNOWN"]);
       if (!nextItem) setDone(true);
-    } catch { /* ignore */ }
+    } catch (e: any) {
+      setError(e?.message ?? t("common.error"));
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { load(); }, [projectId, phase, task]);
+
+  useEffect(() => {
+    if (!projectId || !item?.item_id) {
+      setComparison(null);
+      return;
+    }
+    api.getLabelComparison(projectId, item.item_id)
+      .then((r: any) => setComparison(r.comparison))
+      .catch(() => setComparison(null));
+  }, [projectId, item?.item_id]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowLeft" && lastItem && !undoing) {
+        e.preventDefault();
+        void undo();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [lastItem, undoing]);
 
   const submit = async (label: string) => {
     if (!projectId || !item || submitting) return;
     setSubmitting(true);
     setLastItem(item);
+    const prevProgress = progress;
+    const prevItem = item;
+    setProgress((p) => ({ ...p, done: Math.min(p.total, p.done + 1) }));
+    setItem(null);
     try {
       await api.submitLabel(projectId, {
-        item_id: item.item_id,
+        item_id: prevItem.item_id,
         label,
         phase,
         attempt: tracker.finalize(),
       });
       await load();
+    } catch (e: any) {
+      setError(e?.message ?? t("common.error"));
+      setItem(prevItem);
+      setProgress(prevProgress);
     } finally {
       setSubmitting(false);
     }
@@ -77,7 +118,7 @@ export function LabelingPage() {
     return (
       <div className="page" style={{ justifyContent: "center", minHeight: "100dvh" }}>
         <div className="welcome-card">
-          <div style={{ fontSize: 56, marginBottom: 12 }}>🎉</div>
+          <div style={{ fontSize: 56, marginBottom: 12 }} aria-label="celebration">🎉</div>
           <h2>{t("labeling.allDone")}</h2>
           <p style={{ color: "var(--color-text-muted)", marginTop: 8 }}>
             {t("labeling.progress")}: {progress.done}/{progress.total}
@@ -113,9 +154,17 @@ export function LabelingPage() {
               {undoing ? "…" : t("labeling.undo")}
             </button>
           )}
-          <Link to={`/projects/${projectId}`} style={{ fontSize: 12, color: "var(--color-text-muted)", textDecoration: "none" }}>←</Link>
+          <Link
+            to={`/projects/${projectId}`}
+            aria-label={t("projects.backToProject")}
+            style={{ fontSize: 12, color: "var(--color-text-muted)", textDecoration: "none" }}
+          >
+            ←
+          </Link>
         </div>
       </div>
+
+      {error && <div className="error-box">{error}</div>}
 
       {/* Undo banner */}
       {lastItem && (
@@ -130,12 +179,21 @@ export function LabelingPage() {
 
       {item ? (
         <>
-          <DataItemDisplay item={item} />
+          <DataItemDisplay item={item} projectId={projectId} labels={labels} />
           <LabelingCard labels={labels} onSubmit={submit} disabled={submitting} />
-          <LabelComparison manualLabel={item?.my_label} llmLabel={item?.llm_label} />
+          <LabelComparison
+            manualLabel={comparison?.manual_label ?? item?.my_label}
+            llmLabel={comparison?.predicted_label ?? comparison?.accepted_label ?? item?.llm_label}
+            confidence={comparison?.confidence}
+            reasoning={comparison?.reasoning}
+          />
         </>
-      ) : (
+      ) : loading ? (
         <div className="card skeleton" style={{ height: 200 }} />
+      ) : (
+        <div className="card" style={{ textAlign: "center", color: "var(--color-text-muted)" }}>
+          {t("labeling.allDone")}
+        </div>
       )}
     </div>
   );

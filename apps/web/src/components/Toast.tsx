@@ -27,7 +27,7 @@ export function useToast() {
 
 export function ToastContainer({ toasts }: { toasts: ToastItem[] }) {
   return (
-    <div className="toast-container">
+    <div className="toast-container" role="status" aria-live="polite" aria-atomic="true">
       {toasts.map((t) => (
         <div key={t.id} className={`toast ${t.kind}`}>{t.msg}</div>
       ))}

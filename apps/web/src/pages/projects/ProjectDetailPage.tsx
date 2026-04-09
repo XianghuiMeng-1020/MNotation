@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { BarChart } from "../../components/BarChart";
+import { ChatPanel } from "../../components/ChatPanel";
 import { NotificationBell } from "../../components/NotificationBell";
+import { PresenceBar } from "../../components/PresenceBar";
 import { api } from "../../lib/api";
 import { useI18n } from "../../lib/i18n";
 
@@ -11,17 +12,23 @@ export function ProjectDetailPage() {
   const [project, setProject] = useState<any>(null);
   const [overview, setOverview] = useState<any>(null);
   const [irr, setIrr] = useState<any>(null);
+  const [messages, setMessages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [chatOpen, setChatOpen] = useState(false);
 
   useEffect(() => {
     if (!projectId) return;
     setLoading(true);
+    setError("");
     Promise.all([
       api.getProject(projectId).then((r: any) => setProject(r.project)),
       api.getStatsOverview(projectId).then((r: any) => setOverview(r)),
       api.getLatestIrr(projectId).then((r: any) => setIrr(r)).catch(() => setIrr(null)),
-    ]).finally(() => setLoading(false));
-  }, [projectId]);
+      api.getMessages(projectId).then((r: any) => setMessages(r.messages ?? [])),
+    ]).catch((e: any) => setError(e?.message ?? t("common.error")))
+      .finally(() => setLoading(false));
+  }, [projectId, t]);
 
   const pct = overview?.total_items > 0 ? Math.round((overview.total_labels / overview.total_items) * 100) : 0;
 
@@ -34,6 +41,8 @@ export function ProjectDetailPage() {
     { icon: "📈", label: t("projects.visualization"), to: `/projects/${projectId}/visualization` },
     { icon: "📝", label: t("projects.survey"), to: `/projects/${projectId}/survey` },
     { icon: "📤", label: t("projects.exportData"), to: `/projects/${projectId}/export` },
+    { icon: "📋", label: "Data items", to: `/projects/${projectId}/data-items` },
+    { icon: "⏱️", label: "Productivity", to: `/projects/${projectId}/productivity` },
     { icon: "⚙️", label: t("projects.settings"), to: `/projects/${projectId}/settings` },
     { icon: "🗂️", label: t("projects.adminDashboard"), to: `/projects/${projectId}/admin` },
   ];
@@ -62,6 +71,10 @@ export function ProjectDetailPage() {
         </div>
       ) : (
         <>
+          {error && <div className="error-box">{error}</div>}
+          <div style={{ marginBottom: 12 }}>
+            <PresenceBar projectId={projectId} />
+          </div>
           {/* Progress card */}
           <div className="card" style={{ marginBottom: 12 }}>
             <h3 style={{ margin: "0 0 12px", fontSize: 14 }}>{t("projects.progress")}</h3>
@@ -101,13 +114,6 @@ export function ProjectDetailPage() {
             </div>
           )}
 
-          {/* Chart */}
-          {overview?.labels?.length > 0 && (() => {
-            const counts: Record<string, number> = {};
-            overview.labels.forEach((l: string, i: number) => { counts[l] = overview.values?.[i] ?? 0; });
-            return <BarChart title={t("admin.labelDistribution")} counts={counts} />;
-          })()}
-
           {/* Quick Actions */}
           <h3 style={{ fontSize: 14, margin: "0 0 8px" }}>{t("projects.quickActions")}</h3>
           <div className="label-grid" style={{ gridTemplateColumns: "1fr 1fr" }}>
@@ -117,10 +123,30 @@ export function ProjectDetailPage() {
                 to={to}
                 className={`label-btn${primary ? " active" : ""}`}
                 style={{ textDecoration: "none", fontSize: 13, gap: 6 }}
+                aria-label={label}
               >
-                <span>{icon}</span> {label}
+                <span aria-hidden="true">{icon}</span> {label}
               </Link>
             ))}
+          </div>
+
+          <div className="card" style={{ marginTop: 12 }}>
+            <button className="btn sm" onClick={() => setChatOpen((x) => !x)}>
+              {chatOpen ? t("common.hide") : t("common.show")} Chat
+            </button>
+            {chatOpen && (
+              <div style={{ marginTop: 10 }}>
+                <ChatPanel
+                  projectId={projectId}
+                  messages={messages}
+                  onSend={async (content) => {
+                    await api.postMessage(projectId, { content, message_type: "chat" });
+                    const res = await api.getMessages(projectId) as any;
+                    setMessages(res.messages ?? []);
+                  }}
+                />
+              </div>
+            )}
           </div>
         </>
       )}

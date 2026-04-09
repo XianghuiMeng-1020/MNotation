@@ -32,7 +32,7 @@ export function AdminDashboardPage() {
     <div className="page">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
         <div>
-          <Link to={`/projects/${projectId}`} style={{ fontSize: "0.82rem", color: "var(--text-muted)", textDecoration: "none" }}>← Back</Link>
+          <Link to={`/projects/${projectId}`} style={{ fontSize: "0.82rem", color: "var(--text-muted)", textDecoration: "none" }}>← {t("projects.backToProject")}</Link>
           <h1 style={{ margin: "0.25rem 0 0" }}>{t("admin.title")}</h1>
         </div>
         <Link to={`/projects/${projectId}/admin/config`} className="btn">{t("admin.config")}</Link>
@@ -93,9 +93,9 @@ export function AdminDashboardPage() {
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.88rem" }}>
                   <thead>
                     <tr>
-                      <th style={thStyle}>Member</th>
-                      <th style={thStyle}>Avg Active (ms)</th>
-                      <th style={thStyle}>Avg Idle (ms)</th>
+                      <th style={thStyle}>{t("admin.member")}</th>
+                      <th style={thStyle}>{t("admin.avgActiveMs")}</th>
+                      <th style={thStyle}>{t("admin.avgIdleMs")}</th>
                     </tr>
                   </thead>
                   <tbody>

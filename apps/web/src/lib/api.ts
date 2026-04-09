@@ -37,6 +37,22 @@ async function req(path: string, init?: RequestInit) {
   return res.json();
 }
 
+async function reqBlob(path: string, init?: RequestInit) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    credentials: "include",
+    headers: { ...(init?.headers ?? {}) },
+    ...init,
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `HTTP ${res.status}`);
+  }
+  return {
+    blob: await res.blob(),
+    filename: res.headers.get("content-disposition")?.match(/filename="([^"]+)"/)?.[1] ?? null
+  };
+}
+
 export const api = {
   login: (email: string, name?: string) => req("/api/auth/login", { method: "POST", body: JSON.stringify({ email, name }) }),
   me: () => req("/api/auth/me"),
@@ -57,7 +73,13 @@ export const api = {
   configureDataset: (id: string, datasetId: string, body: unknown) => req(`/api/projects/${id}/datasets/${datasetId}/configure`, { method: "POST", body: JSON.stringify(body) }),
   processDataset: (id: string, datasetId: string) => req(`/api/projects/${id}/datasets/${datasetId}/process`, { method: "POST" }),
   getDatasets: (id: string) => req(`/api/projects/${id}/datasets`),
-  getDataItems: (id: string) => req(`/api/projects/${id}/data-items`),
+  getDataItems: (id: string, opts?: { cursor?: number; limit?: number }) => {
+    const q = new URLSearchParams();
+    if (opts?.cursor != null) q.set("cursor", String(opts.cursor));
+    if (opts?.limit != null) q.set("limit", String(opts.limit));
+    const qs = q.toString();
+    return req(`/api/projects/${id}/data-items${qs ? `?${qs}` : ""}`);
+  },
   getDataItem: (id: string, itemId: string) => req(`/api/projects/${id}/data-items/${itemId}`),
 
   getCodingScheme: (id: string) => req(`/api/projects/${id}/coding-scheme`),
@@ -114,13 +136,56 @@ export const api = {
   getStatsPerMember: (id: string) => req(`/api/projects/${id}/stats/per-member`),
   getLabelDistribution: (id: string) => req(`/api/projects/${id}/stats/label-distribution`),
   getTimeAnalysis: (id: string) => req(`/api/projects/${id}/stats/time-analysis`),
-  exportData: (id: string, format: "csv" | "json" | "xlsx") => req(`/api/projects/${id}/export?format=${format}`),
+  exportData: (
+    id: string,
+    format: "csv" | "json" | "xlsx" | "jsonl" | "refi-qda" | "parquet" | "parquet-zstd" | "arrow",
+    signal?: AbortSignal
+  ) => reqBlob(`/api/projects/${id}/export?format=${format}`, { signal }),
+
+  suggestCodebook: (id: string, body?: { sample_limit?: number }) =>
+    req(`/api/projects/${id}/ai/suggest-codebook`, { method: "POST", body: JSON.stringify(body ?? {}) }),
+  getFewShot: (id: string) => req(`/api/projects/${id}/few-shot`),
+  setFewShot: (id: string, body: { examples: Array<{ item_id: string; example_label: string; note?: string }> }) =>
+    req(`/api/projects/${id}/few-shot`, { method: "POST", body: JSON.stringify(body) }),
+  postPresence: (id: string, body: { item_id?: string | null }) =>
+    req(`/api/projects/${id}/presence`, { method: "POST", body: JSON.stringify(body) }),
+  getPresence: (id: string) => req(`/api/projects/${id}/presence`),
+  getAuditLog: (id: string) => req(`/api/projects/${id}/audit-log`),
+  getWebhooks: (id: string) => req(`/api/projects/${id}/webhooks`),
+  createWebhook: (id: string, body: { url: string; events?: string[]; secret?: string }) =>
+    req(`/api/projects/${id}/webhooks`, { method: "POST", body: JSON.stringify(body) }),
+  deleteWebhook: (id: string, webhookId: string) =>
+    req(`/api/projects/${id}/webhooks/${webhookId}`, { method: "DELETE" }),
+  getSpanAnnotations: (id: string, itemId: string) => req(`/api/projects/${id}/span-annotations?item_id=${encodeURIComponent(itemId)}`),
+  postSpanAnnotation: (id: string, body: { item_id: string; start_offset: number; end_offset: number; label: string }) =>
+    req(`/api/projects/${id}/span-annotations`, { method: "POST", body: JSON.stringify(body) }),
+  surveyImport: (
+    id: string,
+    body: {
+      provider?: "qualtrics" | "surveymonkey";
+      api_token?: string;
+      datacenter?: string;
+      survey_id?: string;
+      text_field?: string;
+    }
+  ) => req(`/api/projects/${id}/integrations/survey-import`, { method: "POST", body: JSON.stringify(body) }),
+  /** @deprecated use surveyImport */
+  surveyImportStub: (
+    id: string,
+    body: { provider?: string; api_key?: string; api_token?: string; datacenter?: string; survey_id?: string; text_field?: string }
+  ) => req(`/api/projects/${id}/integrations/survey-import`, { method: "POST", body: JSON.stringify(body) }),
+  getAnalyticsProductivity: (id: string) => req(`/api/projects/${id}/analytics/productivity`),
+  getAnalyticsEta: (id: string) => req(`/api/projects/${id}/analytics/eta`),
+  getAnalyticsPhaseEvolution: (id: string) => req(`/api/projects/${id}/analytics/phase-evolution`),
+  getIrrDrill: (id: string, maxKappa?: number) =>
+    req(`/api/projects/${id}/irr/drill${maxKappa != null ? `?max_kappa=${maxKappa}` : ""}`),
 
   getSurveyResponse: (id: string) => req(`/api/projects/${id}/survey/my`),
   submitProjectSurvey: (id: string, body: unknown) => req(`/api/projects/${id}/survey/submit`, { method: "POST", body: JSON.stringify(body) }),
   getSurveyAll: (id: string) => req(`/api/projects/${id}/survey/all`),
 
   getVizStats: (id: string) => req(`/api/projects/${id}/viz/stats`),
+  getVizLlmConfidence: (id: string) => req(`/api/projects/${id}/viz/llm-confidence`),
 
   health: () => req("/api/health"),
 

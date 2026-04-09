@@ -9,20 +9,32 @@ export function ProjectListPage() {
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [query, setQuery] = useState("");
 
-  useEffect(() => {
+  const loadProjects = () => {
     setLoading(true);
     api.getProjects()
       .then((r: any) => setProjects(r.projects ?? []))
       .catch((e: any) => {
-        if (e?.message?.includes("unauthorized")) {
+        const message = String(e?.message ?? "");
+        if (message.includes("unauthorized")) {
           nav("/login");
           return;
         }
-        setError(e?.message ?? t("common.error"));
+        setError(message || t("common.error"));
       })
       .finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => {
+    loadProjects();
+  }, [nav, t]);
+
+  const filteredProjects = projects.filter((p: any) => {
+    const q = query.trim().toLowerCase();
+    if (!q) return true;
+    return String(p?.name ?? "").toLowerCase().includes(q) || String(p?.description ?? "").toLowerCase().includes(q);
+  });
 
   return (
     <div className="page" style={{ maxWidth: 640 }}>
@@ -36,8 +48,22 @@ export function ProjectListPage() {
           + {t("common.create")}
         </Link>
       </div>
+      <div className="card" style={{ padding: 12 }}>
+        <input
+          className="input"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={t("projects.searchPlaceholder")}
+          aria-label={t("projects.searchPlaceholder")}
+        />
+      </div>
 
-      {error && <div className="error-box">{error}</div>}
+      {error && (
+        <div className="error-box" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+          <span>{error}</span>
+          <button className="btn sm" onClick={loadProjects}>{t("common.retry")}</button>
+        </div>
+      )}
 
       {loading ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -45,17 +71,17 @@ export function ProjectListPage() {
             <div key={i} className="card skeleton" style={{ height: 90 }} />
           ))}
         </div>
-      ) : projects.length === 0 ? (
+      ) : filteredProjects.length === 0 ? (
         <div className="card" style={{ textAlign: "center", padding: "48px 24px" }}>
           <div style={{ fontSize: 48, marginBottom: 12 }}>📂</div>
-          <p style={{ marginBottom: 16 }}>{t("projects.empty")}</p>
+          <p style={{ marginBottom: 16 }}>{query.trim() ? t("projects.noSearchResults") : t("projects.empty")}</p>
           <Link to="/projects/new" className="btn primary lg" style={{ textDecoration: "none" }}>
             {t("projects.createFirst")}
           </Link>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {projects.map((p: any) => (
+          {filteredProjects.map((p: any) => (
             <Link
               key={p.project_id}
               to={`/projects/${p.project_id}`}

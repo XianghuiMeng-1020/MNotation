@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { CodingSchemeEditor, type CodeLabel } from "../../components/CodingSchemeEditor";
+import { FewShotManager } from "../../components/FewShotManager";
 import { TeamManager } from "../../components/TeamManager";
 import { api } from "../../lib/api";
 import { useI18n } from "../../lib/i18n";
 import { storage } from "../../lib/storage";
 
-type Tab = "general" | "team" | "scheme" | "config" | "prompts" | "al" | "danger";
+type Tab = "general" | "team" | "scheme" | "config" | "prompts" | "al" | "v3" | "danger";
 
 export function ProjectSettingsPage() {
   const { projectId = "" } = useParams();
@@ -26,6 +27,17 @@ export function ProjectSettingsPage() {
   const [alRunning, setAlRunning] = useState(false);
   const [alDone, setAlDone] = useState(false);
   const [changeNote, setChangeNote] = useState("");
+  const [v3Suggest, setV3Suggest] = useState<any>(null);
+  const [v3Loading, setV3Loading] = useState(false);
+  const [webhookUrl, setWebhookUrl] = useState("");
+  const [audit, setAudit] = useState<any[]>([]);
+  const [siProvider, setSiProvider] = useState<"qualtrics" | "surveymonkey">("qualtrics");
+  const [siDc, setSiDc] = useState("ca1");
+  const [siSurvey, setSiSurvey] = useState("");
+  const [siToken, setSiToken] = useState("");
+  const [siField, setSiField] = useState("");
+  const [siBusy, setSiBusy] = useState(false);
+  const [siMsg, setSiMsg] = useState("");
   const currentUserId = storage.get("userId") ?? "";
 
   const load = async () => {
@@ -103,6 +115,7 @@ export function ProjectSettingsPage() {
     { id: "config", label: t("settings.config") },
     { id: "prompts", label: t("settings.prompts") },
     { id: "al", label: t("settings.al") },
+    { id: "v3", label: "V3 AI & Ops" },
     { id: "danger", label: t("settings.danger") },
   ];
 
@@ -203,6 +216,113 @@ export function ProjectSettingsPage() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {tab === "v3" && (
+        <div className="card" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          <div>
+            <h3 style={{ margin: "0 0 8px" }}>AI codebook suggestion</h3>
+            <p style={{ fontSize: 13, color: "var(--text-muted)" }}>Uses LLM to propose initial codes from your corpus (first N items).</p>
+            <button
+              className="btn primary"
+              disabled={v3Loading}
+              onClick={async () => {
+                setV3Loading(true);
+                try {
+                  const r = await api.suggestCodebook(projectId, { sample_limit: 40 });
+                  setV3Suggest(r);
+                } finally {
+                  setV3Loading(false);
+                }
+              }}
+            >
+              {v3Loading ? "…" : "Suggest codebook"}
+            </button>
+            {v3Suggest?.labels?.length > 0 && (
+              <pre style={{ marginTop: 12, fontSize: 12, maxHeight: 240, overflow: "auto" }}>{JSON.stringify(v3Suggest.labels, null, 2)}</pre>
+            )}
+          </div>
+          <div>
+            <h3 style={{ margin: "0 0 8px" }}>Few-shot 金标示例</h3>
+            <FewShotManager projectId={projectId} scheme={scheme} />
+          </div>
+          <div>
+            <h3 style={{ margin: "0 0 8px" }}>Webhook (Slack / 飞书)</h3>
+            <input className="input" placeholder="https://hooks.slack.com/..." value={webhookUrl} onChange={(e) => setWebhookUrl(e.target.value)} />
+            <button
+              className="btn"
+              style={{ marginTop: 8 }}
+              onClick={async () => {
+                if (!webhookUrl.trim()) return;
+                await api.createWebhook(projectId, { url: webhookUrl, events: ["*", "conflict.detected"] });
+                setWebhookUrl("");
+                alert("Webhook saved");
+              }}
+            >
+              Save webhook
+            </button>
+          </div>
+          <div>
+            <h3 style={{ margin: "0 0 8px" }}>Audit log</h3>
+            <button
+              className="btn"
+              onClick={async () => {
+                const r = await api.getAuditLog(projectId);
+                setAudit(r.entries ?? []);
+              }}
+            >
+              Load audit log
+            </button>
+            {audit.length > 0 && (
+              <pre style={{ marginTop: 12, fontSize: 11, maxHeight: 200, overflow: "auto" }}>{JSON.stringify(audit.slice(0, 20), null, 2)}</pre>
+            )}
+          </div>
+          <div>
+            <h3 style={{ margin: "0 0 8px" }}>问卷导入 (Qualtrics / SurveyMonkey)</h3>
+            <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 8 }}>
+              Qualtrics：填写数据中心、Survey ID、API Token；开放题将导入为 data_items。Token 也可配置在 Worker 环境变量 QUALTRICS_API_TOKEN。
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, maxWidth: 480 }}>
+              <select className="input" value={siProvider} onChange={(e) => setSiProvider(e.target.value as "qualtrics" | "surveymonkey")}>
+                <option value="qualtrics">Qualtrics</option>
+                <option value="surveymonkey">SurveyMonkey</option>
+              </select>
+              {siProvider === "qualtrics" && (
+                <input className="input" placeholder="数据中心 (如 ca1, yul1)" value={siDc} onChange={(e) => setSiDc(e.target.value)} />
+              )}
+              <input className="input" placeholder="Survey ID" value={siSurvey} onChange={(e) => setSiSurvey(e.target.value)} />
+              <input className="input" type="password" placeholder="API Token（可选若已配置环境变量）" value={siToken} onChange={(e) => setSiToken(e.target.value)} />
+              {siProvider === "qualtrics" && (
+                <input className="input" placeholder="开放题字段 QID（可选，如 QID3_TEXT）" value={siField} onChange={(e) => setSiField(e.target.value)} />
+              )}
+              <button
+                className="btn primary"
+                disabled={siBusy || !siSurvey.trim()}
+                onClick={async () => {
+                  setSiBusy(true);
+                  setSiMsg("");
+                  try {
+                    const r: any = await api.surveyImport(projectId, {
+                      provider: siProvider,
+                      datacenter: siDc,
+                      survey_id: siSurvey.trim(),
+                      api_token: siToken.trim() || undefined,
+                      text_field: siField.trim() || undefined
+                    });
+                    setSiMsg(`成功导入 ${r.imported ?? 0} 条`);
+                  } catch (e: any) {
+                    setSiMsg(e?.message ?? "导入失败");
+                  } finally {
+                    setSiBusy(false);
+                  }
+                }}
+              >
+                {siBusy ? "导入中…" : "开始导入"}
+              </button>
+              {siMsg && <p style={{ fontSize: 13, color: siMsg.startsWith("成功") ? "#16a34a" : "#dc2626" }}>{siMsg}</p>}
+            </div>
+          </div>
         </div>
       )}
 

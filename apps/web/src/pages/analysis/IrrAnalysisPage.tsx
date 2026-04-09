@@ -11,6 +11,12 @@ export function IrrAnalysisPage() {
   const { irr, history, calculating, calculate } = useIrr(projectId);
   const [aiSuggestion, setAiSuggestion] = useState("");
   const [gettingSuggestion, setGettingSuggestion] = useState(false);
+  const [drill, setDrill] = useState<any>(null);
+
+  const loadDrill = async () => {
+    const r = await api.getIrrDrill(projectId, 0.5);
+    setDrill(r);
+  };
 
   const getAiSuggestion = async () => {
     setGettingSuggestion(true);
@@ -27,7 +33,7 @@ export function IrrAnalysisPage() {
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
         <div>
-          <Link to={`/projects/${projectId}`} style={{ fontSize: "0.82rem", color: "var(--text-muted)", textDecoration: "none" }}>← Back</Link>
+          <Link to={`/projects/${projectId}`} style={{ fontSize: "0.82rem", color: "var(--text-muted)", textDecoration: "none" }}>← {t("projects.backToProject")}</Link>
           <h1 style={{ margin: "0.25rem 0 0" }}>{t("irr.title")}</h1>
         </div>
         <div style={{ display: "flex", gap: "0.5rem" }}>
@@ -45,8 +51,18 @@ export function IrrAnalysisPage() {
           >
             {gettingSuggestion ? t("common.loading") : t("irr.aiSuggestRun")}
           </button>
+          <button className="btn" type="button" onClick={() => void loadDrill()}>
+            IRR drill-down
+          </button>
         </div>
       </div>
+
+      {drill && (
+        <div className="card" style={{ marginBottom: 12 }}>
+          <h3 style={{ marginBottom: 8 }}>Low agreement categories</h3>
+          <pre style={{ fontSize: 12 }}>{JSON.stringify(drill.low_agreement_categories ?? [], null, 2)}</pre>
+        </div>
+      )}
 
       <IrrDashboard irr={irr} history={history} />
 

@@ -33,8 +33,51 @@ export function CreateProjectPage() {
   const [fileBase64, setFileBase64] = useState("");
   const [fileName, setFileName] = useState("");
   const [fileFormat, setFileFormat] = useState("txt");
-  const [previewCols] = useState<string[]>([]);
-  const [previewRows] = useState<Record<string, string>[]>([]);
+  const [previewCols, setPreviewCols] = useState<string[]>([]);
+  const [previewRows, setPreviewRows] = useState<Record<string, string>[]>([]);
+
+  const buildLocalPreview = async (file: File, format: string) => {
+    try {
+      const text = await file.text();
+      if (format === "csv") {
+        const lines = text.split(/\r?\n/).filter(Boolean).slice(0, 21);
+        if (lines.length === 0) return;
+        const headers = lines[0].split(",").map((h) => h.trim().replace(/^"|"$/g, ""));
+        const rows = lines.slice(1).map((line) => {
+          const values = line.split(",").map((v) => v.trim().replace(/^"|"$/g, ""));
+          return Object.fromEntries(headers.map((h, idx) => [h, values[idx] ?? ""]));
+        });
+        setPreviewCols(headers);
+        setPreviewRows(rows);
+        return;
+      }
+
+      if (format === "jsonl") {
+        const lines = text.split(/\r?\n/).filter(Boolean).slice(0, 20);
+        const rows = lines.map((line) => JSON.parse(line));
+        const cols = Array.from(new Set(rows.flatMap((r) => Object.keys(r))));
+        setPreviewCols(cols);
+        setPreviewRows(rows.map((r) => Object.fromEntries(cols.map((c) => [c, String(r[c] ?? "")]))));
+        return;
+      }
+
+      if (format === "json") {
+        const data = JSON.parse(text);
+        const rows = Array.isArray(data) ? data.slice(0, 20) : [];
+        const cols = Array.from(new Set(rows.flatMap((r) => Object.keys(r))));
+        setPreviewCols(cols);
+        setPreviewRows(rows.map((r) => Object.fromEntries(cols.map((c) => [c, String(r[c] ?? "")]))));
+        return;
+      }
+
+      const lines = text.split(/\r?\n/).filter(Boolean).slice(0, 20);
+      setPreviewCols(["text"]);
+      setPreviewRows(lines.map((line) => ({ text: line })));
+    } catch {
+      setPreviewCols([]);
+      setPreviewRows([]);
+    }
+  };
 
   const canNext = () => {
     if (step === 1) return name.trim().length > 0;
@@ -46,14 +89,14 @@ export function CreateProjectPage() {
     setFileBase64(base64);
     setFileName(file.name);
     setFileFormat(format);
-    // Parse preview via a temporary upload and preview call (or skip for now)
-    // We'll just proceed; actual parsing happens on the server during process step
+    await buildLocalPreview(file, format);
   };
 
   const create = async () => {
     setCreating(true);
     setError("");
     try {
+      const warnings: string[] = [];
       const res = await api.createProject({
         name,
         description,
@@ -77,18 +120,30 @@ export function CreateProjectPage() {
           const datasetId = dsRes.dataset_id;
           await api.configureDataset(projectId, datasetId, chunkConfig);
           await api.processDataset(projectId, datasetId);
-        } catch { /* non-fatal */ }
+        } catch {
+          warnings.push(t("wizard.warnDataset"));
+        }
       }
 
       // Set coding scheme if provided
       if (codes.length > 0) {
         try {
           await api.setCodingScheme(projectId, { labels: codes, change_note: "Initial coding scheme" });
-        } catch { /* non-fatal */ }
+        } catch {
+          warnings.push(t("wizard.warnScheme"));
+        }
       }
 
       // Generate assignments
-      try { await api.generateAssignments(projectId); } catch { /* non-fatal */ }
+      try {
+        await api.generateAssignments(projectId);
+      } catch {
+        warnings.push(t("wizard.warnAssignments"));
+      }
+
+      if (warnings.length > 0) {
+        window.alert(warnings.join("\n"));
+      }
 
       nav(`/projects/${projectId}`);
     } catch (e: any) {
@@ -153,9 +208,11 @@ export function CreateProjectPage() {
           <h2>{t("wizard.step2")}</h2>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
             {DATA_TYPE_OPTIONS.map((opt) => (
-              <div
+              <button
                 key={opt.value}
+                type="button"
                 onClick={() => setDataType(opt.value)}
+                aria-pressed={dataType === opt.value}
                 style={{
                   padding: "1.25rem",
                   borderRadius: "10px",
@@ -163,12 +220,13 @@ export function CreateProjectPage() {
                   cursor: "pointer",
                   textAlign: "center",
                   background: dataType === opt.value ? "rgba(99,102,241,0.05)" : "transparent",
-                  transition: "all 0.2s"
+                  transition: "all 0.2s",
+                  appearance: "none"
                 }}
               >
                 <div style={{ fontSize: "2rem", marginBottom: "0.4rem" }}>{opt.icon}</div>
                 <div style={{ fontWeight: 500, fontSize: "0.9rem" }}>{opt.label}</div>
-              </div>
+              </button>
             ))}
           </div>
         </div>
@@ -181,7 +239,7 @@ export function CreateProjectPage() {
           {fileName && (
             <div className="card" style={{ marginTop: "1rem" }}>
               <p style={{ margin: 0 }}>
-                <strong>File:</strong> {fileName} ({fileFormat.toUpperCase()})
+                <strong>{t("upload.file")}:</strong> {fileName} ({fileFormat.toUpperCase()})
               </p>
             </div>
           )}
@@ -263,10 +321,10 @@ export function CreateProjectPage() {
               { label: t("projects.dataType"), value: t(`projects.dataType.${dataType}` as any) },
               { label: t("projects.samplingMethod"), value: t(`projects.samplingMethod.${samplingMethod}` as any) },
               { label: t("projects.codingMethod"), value: t(`projects.codingMethod.${codingMethod}` as any) },
-              { label: t("wizard.step3"), value: fileName || "(none)" },
+              { label: t("wizard.step3"), value: fileName || t("common.none") },
               { label: t("chunk.mode"), value: t(`chunk.mode.${chunkConfig.mode}` as any) },
-              { label: t("settings.scheme"), value: codes.length > 0 ? codes.map((c) => c.code).join(", ") : "(none)" },
-              { label: t("wizard.step7"), value: emails || "(none)" },
+              { label: t("settings.scheme"), value: codes.length > 0 ? codes.map((c) => c.code).join(", ") : t("common.none") },
+              { label: t("wizard.step7"), value: emails || t("common.none") },
             ].map(({ label, value }) => (
               <div key={label} style={{ display: "flex", gap: "0.5rem" }}>
                 <span style={{ color: "var(--text-muted)", minWidth: "120px" }}>{label}:</span>

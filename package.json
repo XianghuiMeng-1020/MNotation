@@ -9,11 +9,27 @@
     "dev:web": "npm --prefix apps/web run dev",
     "build:web": "npm --prefix apps/web run build",
     "lint:web": "npm --prefix apps/web run lint",
+    "test:web": "npm --prefix apps/web run test",
     "deploy:web": "npm --prefix apps/web run deploy",
     "deploy:api": "wrangler deploy",
-    "d1:migrate": "wrangler d1 migrations apply mnotation_db --local"
+    "d1:migrate": "wrangler d1 migrations apply mnotation_db --local",
+    "d1:migrate:remote": "wrangler d1 migrations apply mnotation_db --remote",
+    "test:e2e": "node scripts/e2e_full_test.mjs",
+    "test:playwright": "playwright test",
+    "test:percy": "percy exec -- playwright test tests/e2e/smoke.spec.ts",
+    "test:api": "vitest run --config workers/api/vitest.config.ts"
   },
   "devDependencies": {
+    "@percy/cli": "^1.31.11",
+    "@percy/playwright": "^1.1.0",
+    "@playwright/test": "^1.59.1",
+    "miniflare": "^4.20260405.0",
+    "vitest": "^3.2.4",
     "wrangler": "^4.40.0"
+  },
+  "dependencies": {
+    "apache-arrow": "^21.1.0",
+    "fflate": "^0.8.2",
+    "parquet-wasm": "^0.7.1"
   }
 }

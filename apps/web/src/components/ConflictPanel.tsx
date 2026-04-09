@@ -31,6 +31,7 @@ export function ConflictPanel({ conflicts, projectId, onUpdate }: Props) {
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   const filtered = conflicts.filter((c) => filterStatus === "all" || c.status === filterStatus);
 
@@ -41,7 +42,10 @@ export function ConflictPanel({ conflicts, projectId, onUpdate }: Props) {
     try {
       const res = await api.getConflictMessages(projectId, c.conflict_id) as any;
       setMessages(res.messages ?? []);
-    } catch { /* ignore */ }
+      setError("");
+    } catch (e: any) {
+      setError(e?.message ?? t("common.error"));
+    }
   };
 
   const resolve = async () => {
@@ -51,6 +55,9 @@ export function ConflictPanel({ conflicts, projectId, onUpdate }: Props) {
       await api.resolveConflict(projectId, selected.conflict_id, { resolved_label: resolvedLabel, resolution_note: resolutionNote });
       onUpdate?.();
       setSelected({ ...selected, status: "resolved", resolved_label: resolvedLabel });
+      setError("");
+    } catch (e: any) {
+      setError(e?.message ?? t("common.error"));
     } finally { setSaving(false); }
   };
 
@@ -61,14 +68,22 @@ export function ConflictPanel({ conflicts, projectId, onUpdate }: Props) {
       await api.reopenConflict(projectId, selected.conflict_id);
       onUpdate?.();
       setSelected({ ...selected, status: "open", resolved_label: null });
+      setError("");
+    } catch (e: any) {
+      setError(e?.message ?? t("common.error"));
     } finally { setSaving(false); }
   };
 
   const sendMessage = async () => {
     if (!selected || !newMessage.trim()) return;
-    await api.postMessage(projectId, { content: newMessage, message_type: "chat", conflict_id: selected.conflict_id });
-    setMessages((prev) => [...prev, { content: newMessage, created_at: new Date().toISOString(), user_id: "me" }]);
-    setNewMessage("");
+    try {
+      await api.postMessage(projectId, { content: newMessage, message_type: "chat", conflict_id: selected.conflict_id });
+      setMessages((prev) => [...prev, { content: newMessage, created_at: new Date().toISOString(), user_id: "me" }]);
+      setNewMessage("");
+      setError("");
+    } catch (e: any) {
+      setError(e?.message ?? t("common.error"));
+    }
   };
 
   const labelsForConflict = (c: Conflict): Record<string, string> => {
@@ -140,10 +155,11 @@ export function ConflictPanel({ conflicts, projectId, onUpdate }: Props) {
       <div className="card" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
         {!selected ? (
           <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)" }}>
-            Select a conflict to view details
+            {t("conflicts.empty")}
           </div>
         ) : (
           <>
+            {error && <div className="error-box">{error}</div>}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <h3 style={{ margin: 0 }}>{t("conflicts.coderLabels")}</h3>
               {statusBadge(selected.status)}

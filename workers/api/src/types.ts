@@ -17,8 +17,19 @@ export interface Env {
   LLM_OPENAI_RATIO?: string;
   CF_ACCESS_TEAM_DOMAIN?: string;
   CF_ACCESS_AUD?: string;
+  AUTH_COOKIE_SECRET?: string;
+  ALLOW_HEADER_AUTH?: string;
+  ALLOWED_ORIGINS?: string;
   IRR_AUTO_CHECK_INTERVAL?: string;
   IRR_LOW_THRESHOLD?: string;
+  /** Optional OpenAI-compatible endpoint (Ollama/vLLM) */
+  CUSTOM_LLM_BASE_URL?: string;
+  CUSTOM_LLM_API_KEY?: string;
+  CUSTOM_LLM_MODEL?: string;
+  /** Frontend Sentry DSN (optional, for server-side proxy if needed) */
+  SENTRY_DSN?: string;
+  /** Global fallback Qualtrics token (prefer not to use; pass per-request api_token when possible). */
+  QUALTRICS_API_TOKEN?: string;
 }
 
 export type UserIdentity = {

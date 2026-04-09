@@ -5,7 +5,7 @@ import { api } from "../lib/api";
 export type Member = {
   user_id: string;
   email?: string;
-  role: "owner" | "coder";
+  role: string;
   joined_at?: string;
 };
 
@@ -24,6 +24,7 @@ export function TeamManager({ projectId, members, currentUserId, isOwner, onUpda
   const [inviteError, setInviteError] = useState("");
   const [inviteSuccess, setInviteSuccess] = useState("");
   const [removing, setRemoving] = useState<string | null>(null);
+  const [inviteRole, setInviteRole] = useState<"coder" | "reviewer" | "guest" | "admin">("coder");
 
   const invite = async () => {
     const email = inviteEmail.trim().toLowerCase();
@@ -34,7 +35,7 @@ export function TeamManager({ projectId, members, currentUserId, isOwner, onUpda
     setInviteError("");
     setInviteSuccess("");
     try {
-      await api.addMember(projectId, { email });
+      await api.addMember(projectId, { email, role: inviteRole });
       setInviteEmail("");
       setInviteSuccess(`Invited ${email}`);
       onUpdate?.();
@@ -113,6 +114,15 @@ export function TeamManager({ projectId, members, currentUserId, isOwner, onUpda
       {isOwner && members.length < 10 && (
         <div>
           <label style={{ fontWeight: 500, display: "block", marginBottom: "0.4rem" }}>{t("settings.inviteEmail")}</label>
+          <div style={{ marginBottom: "0.5rem" }}>
+            <label style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>Role</label>
+            <select className="input" value={inviteRole} onChange={(e) => setInviteRole(e.target.value as any)} style={{ width: "100%", marginTop: 4 }}>
+              <option value="coder">Coder</option>
+              <option value="reviewer">Reviewer</option>
+              <option value="guest">Guest (read-only)</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
           <div style={{ display: "flex", gap: "0.5rem" }}>
             <input
               className="input"

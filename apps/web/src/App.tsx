@@ -1,8 +1,10 @@
-import { useEffect, useRef } from "react";
+import { Suspense, lazy, useEffect, useRef } from "react";
 import { Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import "./App.css";
 import { AdminGuard } from "./components/AdminGuard";
+import { CommandPalette } from "./components/CommandPalette";
 import { LanguageSwitcher } from "./components/LanguageSwitcher";
+import { useTheme } from "./lib/theme";
 import { api } from "./lib/api";
 import { ENABLE_ACTIVE_LEARNING } from "./lib/featureFlags";
 import { getSessionId, getConsent } from "./lib/storage";
@@ -24,34 +26,73 @@ import { AdminLoginPage } from "./pages/admin/AdminLoginPage";
 import { AdminUnitsPage } from "./pages/admin/AdminUnitsPage";
 import { AdminOpsPage } from "./pages/admin/AdminOpsPage";
 
-import { LoginPage } from "./pages/auth/LoginPage";
-import { ProjectListPage } from "./pages/projects/ProjectListPage";
-import { ProjectDetailPage } from "./pages/projects/ProjectDetailPage";
-import { CreateProjectPage } from "./pages/projects/CreateProjectPage";
-import { ProjectSettingsPage } from "./pages/projects/ProjectSettingsPage";
-import { LabelingPage } from "./pages/labeling/LabelingPage";
-import { LlmLabelingPage } from "./pages/labeling/LlmLabelingPage";
-import { ConflictResolutionPage } from "./pages/labeling/ConflictResolutionPage";
-import { WelcomePage as V2WelcomePage } from "./pages/labeling/WelcomePage";
-import { SurveyPage } from "./pages/labeling/SurveyPage";
-import { IrrAnalysisPage } from "./pages/analysis/IrrAnalysisPage";
-import { VisualizationPage } from "./pages/analysis/VisualizationPage";
-import { ExportPage } from "./pages/analysis/ExportPage";
-import { AdminDashboardPage } from "./pages/admin/AdminDashboardPage";
+const HomePage = lazy(() => import("./pages/HomePage").then((m) => ({ default: m.HomePage })));
+const LoginPage = lazy(() => import("./pages/auth/LoginPage").then((m) => ({ default: m.LoginPage })));
+const ProjectListPage = lazy(() => import("./pages/projects/ProjectListPage").then((m) => ({ default: m.ProjectListPage })));
+const ProjectDetailPage = lazy(() => import("./pages/projects/ProjectDetailPage").then((m) => ({ default: m.ProjectDetailPage })));
+const CreateProjectPage = lazy(() => import("./pages/projects/CreateProjectPage").then((m) => ({ default: m.CreateProjectPage })));
+const ProjectSettingsPage = lazy(() => import("./pages/projects/ProjectSettingsPage").then((m) => ({ default: m.ProjectSettingsPage })));
+const LabelingPage = lazy(() => import("./pages/labeling/LabelingPage").then((m) => ({ default: m.LabelingPage })));
+const LlmLabelingPage = lazy(() => import("./pages/labeling/LlmLabelingPage").then((m) => ({ default: m.LlmLabelingPage })));
+const ConflictResolutionPage = lazy(() => import("./pages/labeling/ConflictResolutionPage").then((m) => ({ default: m.ConflictResolutionPage })));
+const V2WelcomePage = lazy(() => import("./pages/labeling/WelcomePage").then((m) => ({ default: m.WelcomePage })));
+const SurveyPage = lazy(() => import("./pages/labeling/SurveyPage").then((m) => ({ default: m.SurveyPage })));
+const IrrAnalysisPage = lazy(() => import("./pages/analysis/IrrAnalysisPage").then((m) => ({ default: m.IrrAnalysisPage })));
+const VisualizationPage = lazy(() => import("./pages/analysis/VisualizationPage").then((m) => ({ default: m.VisualizationPage })));
+const ExportPage = lazy(() => import("./pages/analysis/ExportPage").then((m) => ({ default: m.ExportPage })));
+const AdminDashboardPage = lazy(() => import("./pages/admin/AdminDashboardPage").then((m) => ({ default: m.AdminDashboardPage })));
+const ProductivityPage = lazy(() => import("./pages/analysis/ProductivityPage").then((m) => ({ default: m.ProductivityPage })));
+const DataItemsListPage = lazy(() => import("./pages/projects/DataItemsListPage").then((m) => ({ default: m.DataItemsListPage })));
+
+function ThemeToggle() {
+  const { theme, toggle } = useTheme();
+  return (
+    <button type="button" className="btn sm" onClick={toggle} aria-label={theme === "dark" ? "Light mode" : "Dark mode"}>
+      {theme === "dark" ? "☀️" : "🌙"}
+    </button>
+  );
+}
+
+function sanitizePageUrl(raw: string): string {
+  try {
+    const u = new URL(raw);
+    const sensitiveKeys = ["token", "session_id", "sessionId", "auth", "authorization"];
+    for (const key of sensitiveKeys) {
+      if (u.searchParams.has(key)) u.searchParams.set(key, "***");
+    }
+    return u.toString();
+  } catch {
+    return raw
+      .replace(/([?&](?:token|session_id|sessionId|auth|authorization)=)[^&]*/gi, "$1***");
+  }
+}
 
 function App() {
   const location = useLocation();
   const pathnameRef = useRef<string | null>(null);
+  const routeContext = location.pathname.startsWith("/user/")
+    ? "V1 Labeling Flow"
+    : location.pathname.startsWith("/projects/")
+      ? "V2 Project Workspace"
+      : "MNotation";
 
   useEffect(() => {
     const onError = (event: ErrorEvent) => {
       if (!getConsent()) return;
-      api.reportClientError({ message: event.message || "window_error", stack: event.error?.stack, page: window.location.href }).catch(() => undefined);
+      api.reportClientError({
+        message: event.message || "window_error",
+        stack: event.error?.stack,
+        page: sanitizePageUrl(window.location.href)
+      }).catch(() => undefined);
     };
     const onRejection = (event: PromiseRejectionEvent) => {
       if (!getConsent()) return;
       const reason = event.reason instanceof Error ? event.reason : new Error(String(event.reason));
-      api.reportClientError({ message: `unhandled_rejection: ${reason.message}`, stack: reason.stack, page: window.location.href }).catch(() => undefined);
+      api.reportClientError({
+        message: `unhandled_rejection: ${reason.message}`,
+        stack: reason.stack,
+        page: sanitizePageUrl(window.location.href)
+      }).catch(() => undefined);
     };
     window.addEventListener("error", onError);
     window.addEventListener("unhandledrejection", onRejection);
@@ -77,10 +118,22 @@ function App() {
     <>
       {/* Top Nav — V2 style */}
       <nav className="top-nav">
-        <Link to="/projects" className="top-nav-logo">MNotation</Link>
+        <Link to="/" className="top-nav-logo">MNotation</Link>
+        <span style={{ fontSize: 12, color: "var(--text-muted)", marginRight: 8 }}>{routeContext}</span>
+        <ThemeToggle />
         <LanguageSwitcher />
       </nav>
+      <CommandPalette />
 
+      <Suspense
+        fallback={
+          <div className="page">
+            <div className="card" style={{ textAlign: "center", color: "var(--text-muted)" }}>
+              <span className="spinner" aria-label="loading" />
+            </div>
+          </div>
+        }
+      >
       <Routes>
         {/* ─── V1 User routes (original labeling tool) ─────────────── */}
         <Route path="/welcome" element={<WelcomePage />} />
@@ -110,7 +163,7 @@ function App() {
         <Route path="/share/:token" element={<SharePage />} />
 
         {/* ─── V2 Project routes (new multi-project features) ─────── */}
-        <Route path="/" element={<Navigate to="/projects" replace />} />
+        <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/projects" element={<ProjectListPage />} />
         <Route path="/projects/new" element={<CreateProjectPage />} />
@@ -124,11 +177,14 @@ function App() {
         <Route path="/projects/:projectId/survey" element={<SurveyPage />} />
         <Route path="/projects/:projectId/irr" element={<IrrAnalysisPage />} />
         <Route path="/projects/:projectId/export" element={<ExportPage />} />
+        <Route path="/projects/:projectId/productivity" element={<ProductivityPage />} />
+        <Route path="/projects/:projectId/data-items" element={<DataItemsListPage />} />
         <Route path="/projects/:projectId/admin" element={<AdminDashboardPage />} />
         <Route path="/projects/:projectId/admin/config" element={<V1AdminConfigPage />} />
 
-        <Route path="*" element={<Navigate to="/projects" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </Suspense>
     </>
   );
 }

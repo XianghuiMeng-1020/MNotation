@@ -3,8 +3,6 @@
    Indigo → Blue → Cyan 渐变 + 毛玻璃 + 动效
    ========================================================= */
 
-@import url('https://fonts.loli.net/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
-
 :root {
   /* ─── Gradient palette ──────────────────────────────────── */
   --grad-primary: linear-gradient(135deg, #6366f1, #3b82f6);
@@ -54,7 +52,7 @@
   --transition: 250ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-bounce: 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
 
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, Arial, sans-serif;
   font-size: 16px;
   line-height: 1.6;
   color: var(--color-text);
@@ -1919,4 +1917,41 @@ input[type="email"]:focus {
 }
 .top-nav .lang-switcher select {
   background: rgba(255,255,255,.6);
+}
+
+/* ─── V3 Dark mode ─────────────────────────────────────────── */
+html[data-theme="dark"] {
+  --color-bg: #0f172a;
+  --color-text: #f1f5f9;
+  --color-text-secondary: #cbd5e1;
+  --color-text-muted: #94a3b8;
+  --color-surface: rgba(30, 41, 59, 0.85);
+  --color-surface-solid: #1e293b;
+  --color-surface-hover: rgba(51, 65, 85, 0.9);
+  --color-border: rgba(71, 85, 105, 0.6);
+  --color-border-solid: #334155;
+  --grad-page-bg: radial-gradient(ellipse at top, #1e1b4b 0%, #0f172a 55%, #020617 100%);
+}
+html[data-theme="dark"] body {
+  background: var(--grad-page-bg);
+}
+
+/* ─── V3 Command palette ─────────────────────────────────── */
+.command-palette-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 12vh;
+}
+.command-palette {
+  width: min(480px, 92vw);
+  background: var(--color-surface-solid);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-lg);
+  padding: 16px;
 }

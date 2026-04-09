@@ -86,10 +86,19 @@ function TimeCard({
   );
 }
 
+type ConfPoint = {
+  item_id: string;
+  effective_label?: string;
+  predicted_label?: string;
+  confidence: number;
+  text?: string;
+};
+
 export function VisualizationPage() {
   const { projectId = "" } = useParams();
   const { t } = useI18n();
   const [data, setData] = useState<any>(null);
+  const [confPoints, setConfPoints] = useState<ConfPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -104,6 +113,14 @@ export function VisualizationPage() {
       })
       .catch(() => setError(t("viz.noData")))
       .finally(() => setLoading(false));
+  }, [projectId]);
+
+  useEffect(() => {
+    if (!projectId) return;
+    api
+      .getVizLlmConfidence(projectId)
+      .then((r: any) => setConfPoints(Array.isArray(r.points) ? r.points : []))
+      .catch(() => setConfPoints([]));
   }, [projectId]);
 
   if (loading) {
@@ -231,6 +248,62 @@ export function VisualizationPage() {
               />
             </div>
           </div>
+
+          {confPoints.length > 0 && (
+            <div className="card" style={{ marginBottom: "1.25rem" }}>
+              <h3 style={{ margin: "0 0 0.5rem", fontSize: "1rem" }}>LLM 置信度热力图</h3>
+              <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginBottom: "0.75rem" }}>
+                每个色块对应一条 LLM 标注；绿色表示置信度高，红色表示置信度低（更需人工复核）。
+              </p>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(12px, 1fr))",
+                  gap: 3,
+                  maxHeight: 160,
+                  overflow: "auto",
+                  marginBottom: "0.75rem",
+                }}
+              >
+                {confPoints.map((p, hi) => {
+                  const c = Math.max(0, Math.min(1, Number(p.confidence ?? 0)));
+                  const hue = Math.round(120 * c);
+                  return (
+                    <div
+                      key={`${p.item_id}-${hi}`}
+                      title={`${p.item_id} · ${(c * 100).toFixed(0)}% · ${p.effective_label ?? ""}`}
+                      style={{
+                        width: 12,
+                        height: 12,
+                        borderRadius: 2,
+                        background: `hsl(${hue} 70% 42%)`,
+                      }}
+                    />
+                  );
+                })}
+              </div>
+              <table style={{ width: "100%", fontSize: "0.78rem", borderCollapse: "collapse", border: "1px solid var(--border)", borderRadius: 8 }}>
+                <thead>
+                  <tr style={{ background: "var(--surface-raised)", color: "var(--text-muted)" }}>
+                    <th style={{ padding: "0.45rem 0.6rem", textAlign: "left" }}>条目</th>
+                    <th style={{ padding: "0.45rem 0.6rem", textAlign: "left" }}>标签</th>
+                    <th style={{ padding: "0.45rem 0.6rem", textAlign: "right" }}>置信度</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {confPoints.slice(0, 35).map((p, idx) => (
+                    <tr key={`${p.item_id}-${idx}`}>
+                      <td style={{ padding: "0.4rem 0.6rem", borderTop: "1px solid var(--border)", maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis" }}>{p.item_id}</td>
+                      <td style={{ padding: "0.4rem 0.6rem", borderTop: "1px solid var(--border)" }}>{p.effective_label ?? p.predicted_label ?? "—"}</td>
+                      <td style={{ padding: "0.4rem 0.6rem", borderTop: "1px solid var(--border)", textAlign: "right" }}>
+                        {(Math.max(0, Math.min(1, Number(p.confidence))) * 100).toFixed(0)}%
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           {diffItems.length > 0 && (
             <div className="card" style={{ marginBottom: "1.25rem" }}>

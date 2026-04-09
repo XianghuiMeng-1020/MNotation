@@ -36,18 +36,20 @@ export function LoginPage() {
 
         <div style={{ textAlign: "left", marginTop: 24 }}>
           <div className="form-group">
-            <label>{t("auth.email")}</label>
+            <label htmlFor="login-email">{t("auth.email")}</label>
             <input
+              id="login-email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
+              placeholder={t("auth.emailPlaceholder")}
               onKeyDown={(e) => e.key === "Enter" && submit()}
             />
           </div>
           <div className="form-group">
-            <label>{t("auth.displayName")}</label>
+            <label htmlFor="login-display-name">{t("auth.displayName")}</label>
             <input
+              id="login-display-name"
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
